@@ -1,0 +1,832 @@
+{
+  "slug": "substack-domain-surface",
+  "title": "substack domain surface",
+  "frame_slug": "substack-domain-surface",
+  "schema_version": 5,
+  "status": "exported",
+  "created": "2026-09-12T21:27:31Z",
+  "updated": "2026-09-12T21:46:14Z",
+  "targets": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "substack-cli controls a Substack publication and account from an agent-first CLI: publish and schedule posts, read the feed, read comments and reactions, reply and react \u2014 account-agnostic, first proven on jetsonailab.substack.com",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h26",
+      "kind": "honesty",
+      "text": "against jetsonailab.substack.com, 'substack post list --json' returns the archive with no session, and once an authenticated webglass session exists 'substack post publish', 'substack comment reply' and 'substack reaction add' each land a visible change on the site",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c2",
+      "kind": "requirement",
+      "text": "each Substack noun (post, feed, comment, reaction, account/whoami-style identity) is one module under substack_cli/cli/_commands/ exposing register(sub), registered in _build_parser() at the marked comment, with parser_class=_CliArgumentParser passed to every nested add_subparsers() so argparse errors keep the error:/hint: contract and exit 1",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h1",
+      "kind": "honesty",
+      "text": "substack post --bogus exits 1 with error:/hint: on stderr, in text and --json mode",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c3",
+      "kind": "boundary",
+      "text": "the runtime package keeps dependencies = [] (pyproject.toml): HTTP is stdlib urllib for public read endpoints, and every authenticated operation goes through the webglass binary as a subprocess; webglass-cli is an install prerequisite (like devex and agtag), never a Python dependency",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h22",
+      "kind": "honesty",
+      "text": "pyproject [project].dependencies stays [] and 'grep -rn playwright substack_cli' returns nothing",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c4",
+      "kind": "requirement",
+      "text": "Substack API failures map onto the existing exit-code policy: bad user input (unknown post id, invalid slug) exits 1; missing/expired credentials or unreachable substack.com exits 2 via CliError(EXIT_ENV_ERROR); results go to stdout and errors to stderr in both text and --json mode",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h28",
+      "kind": "honesty",
+      "text": "a missing or unauthenticated webglass session exits 2 with a hint naming the session variable; a nonexistent post id exits 1",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c5",
+      "kind": "requirement",
+      "text": "learn.py's _TEXT and _as_json_payload() and explain/catalog.py gain one row/entry per new Substack command path; the root catalog entry and the parser prog/description stop describing the repo as 'a clonable template'",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h4",
+      "kind": "honesty",
+      "text": "tests/test_cli.py's known_paths() walk passes and learn --json lists every new path",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "substack-cli holds no Substack credential at all: the only auth input is a webglass session id; scripts/scan-secrets.py still fails CI on committed credential-shaped strings and on non-localhost URLs under url/endpoint/host/baseUrl keys in JSON files, so no checked-in JSON config may carry https://substack.com",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h5",
+      "kind": "honesty",
+      "text": "python3 scripts/scan-secrets.py exits 0 on the feature branch and no JSON file carries substack.com",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c8",
+      "kind": "audience",
+      "text": "the primary consumer is an AI agent (Claude Code, the Culture mesh resident, or a scheduled routine) driving the publication for the human owner; the human uses the same CLI interactively for spot checks",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h20",
+      "kind": "honesty",
+      "text": "the CLI is driven end-to-end by an agent with no human in the loop: every verb takes --json and no verb prompts interactively (the one-time headed login is the only human step)",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c9",
+      "kind": "boundary",
+      "text": "browser control lives entirely in webglass-cli: substack-cli composes webglass session/page/action verbs and parses their WebOperationResult JSON; it adds no browser code, no form filling and no web UI of its own",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h23",
+      "kind": "honesty",
+      "text": "every authenticated verb's transport is a subprocess call to 'webglass ... --json' with a fake-webglass test double; no substack_cli module imports playwright or opens a browser",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c10",
+      "kind": "requirement",
+      "text": "landing real Substack nouns is a coordinated edit across README.md (Status + CLI table) and all four harness prompt files (CLAUDE.md, AGENTS.override.md, AGENTS.colleague.md, QWEN.md): each drops the 'Status: scaffold' / '(planned)' framing and the 'Adding the Substack surface (planned)' section together; .pi/SYSTEM.md carries no domain text and stays untouched",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h6",
+      "kind": "honesty",
+      "text": "all four harness files and README no longer contain 'Status: scaffold' or '(planned)' for the Substack surface, and harness-smoke --stage config passes",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c11",
+      "kind": "boundary",
+      "text": "the identity plumbing is not touched by domain verbs: doctor.py's _PROMPT_FILE/_RESIDENT_PROMPT, backend-fingerprints.yaml, tests/test_harness_registries.py, scripts/harness-smoke.py, the 19 vendored skills, publish.yml and sonar-project.properties all stay as they are",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h7",
+      "kind": "honesty",
+      "text": "git diff main -- substack_cli/cli/_commands/doctor.py .claude/skills scripts/harness-smoke.py .github/workflows/publish.yml sonar-project.properties is empty",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c12",
+      "kind": "requirement",
+      "text": "the feature PR bumps the version with a minor step (0.9.1 -> 0.10.0) and records the new nouns under '### Added' in CHANGELOG.md, per the every-PR-bumps rule enforced by the version-check job",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h8",
+      "kind": "honesty",
+      "text": "pyproject version is 0.10.0 and CHANGELOG has a matching ### Added entry",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c15",
+      "kind": "requirement",
+      "text": "every Substack noun with action verbs also exposes an 'overview' verb and every verb takes --json, propagating parser_class=type(p) at each nesting level exactly as cli.py does; this is the repo's own convention (cli.py docstring, overview.py conventions text) and is stricter than teken's rubric, which only probes 'cli overview'",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h27",
+      "kind": "honesty",
+      "text": "for each new noun, 'substack `<noun>` overview' exits 0 and every verb accepts --json",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c16",
+      "kind": "requirement",
+      "text": "the Substack API base URL lives as a Python constant (overridable by an env var for testing), never in a JSON config: scan-secrets' endpoint check only parses JSON files, so a JSON config carrying https://substack.com would fail CI while a .py constant passes",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h10",
+      "kind": "honesty",
+      "text": "the base URL is a Python constant overridable by SUBSTACK_API_BASE; no tracked JSON file contains it",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c17",
+      "kind": "requirement",
+      "text": "new noun modules ship with tests that keep aggregate coverage at or above the fail_under=60 floor; HTTP calls are exercised against a fake transport (stdlib urllib opener injection), never against live substack.com in the suite",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h11",
+      "kind": "honesty",
+      "text": "uv run pytest -n auto --cov=substack_cli reports >= 60% and no test opens a network socket",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c18",
+      "kind": "requirement",
+      "text": "descriptive Substack verbs (feed read, post list, comment list, reaction list) never hard-fail on an empty or missing target \u2014 they return 0 with an empty result; only malformed input (exit 1) or auth/network failure (exit 2) raise CliError, mirroring overview.py and doctor.py's return-1-don't-raise split",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h12",
+      "kind": "honesty",
+      "text": "substack feed read on an empty feed and substack comment list on a post with no comments both exit 0 with an empty list",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c23",
+      "kind": "before_state",
+      "text": "today the CLI is the culture-agent-template scaffold: whoami/learn/explain/overview/doctor/cli overview only; managing the publication means the browser, and an agent cannot post, read the feed, or reply at all",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h13",
+      "kind": "honesty",
+      "text": "'uv run substack learn' on main lists only the six scaffold verbs",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c24",
+      "kind": "after_state",
+      "text": "an agent (or the owner) runs 'substack post|feed|comment|reaction|account `<verb>` --json' with a webglass session named in the environment and a --publication host, and gets structured results on stdout and error:/hint: pairs on stderr, for any Substack account",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h14",
+      "kind": "honesty",
+      "text": "the same verbs succeed against two different publication hosts with two cookie sets",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c25",
+      "kind": "why_it_matters",
+      "text": "jetson-ai-lab updates, replies and reactions can be driven by the mesh agent on a schedule instead of by hand, and the same CLI serves any other publication the owner controls",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h21",
+      "kind": "honesty",
+      "text": "one scheduled mesh run publishes a jetson-ai-lab update and replies to a comment without a human touching the browser",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c26",
+      "kind": "success_signal",
+      "text": "at least 5 nouns ship (post, feed, comment, reaction, account), each verb supports --json, teken cli doctor . --strict passes, coverage stays >= 60%, and one real post plus one real reply and one real reaction land on jetsonailab.substack.com via the CLI",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h15",
+      "kind": "honesty",
+      "text": "learn --json lists post, feed, comment, reaction, account with the verbs named in c27, and each exits 0 with --json",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c27",
+      "kind": "requirement",
+      "text": "the four write verbs of v1 are: post publish (from a markdown or JSON body file), post schedule, comment reply, reaction add; the read verbs are: post list/get, feed read, comment list, reaction list, account whoami; subscriber and stats management is a later release",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h16",
+      "kind": "honesty",
+      "text": "learn --json lists exactly the v1 verbs and no subscriber/stats paths",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c34",
+      "kind": "requirement",
+      "text": "v1 splits by auth need: public read verbs (post list/get, comment list, reaction list on public posts) use stdlib HTTP and ship first; owner verbs (post publish/schedule, comment reply, reaction add, feed read, account whoami) are wired to webglass sessions and report a structured backend_unavailable (exit 2) until webglass-cli ships authenticated persistent sessions",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h25",
+      "kind": "honesty",
+      "text": "on a machine without webglass, every public read verb still exits 0 and every owner verb exits 2 with a hint naming webglass-cli",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c38",
+      "kind": "requirement",
+      "text": "write verbs never auto-retry a non-idempotent POST: backoff on 429/5xx applies to GETs only; a failed publish/reply/react reports the failure with exit 2 and any partial state, so a retry cannot double-post or double-comment",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h29",
+      "kind": "honesty",
+      "text": "a fake transport returning 500 to POST /drafts/{id}/publish yields exactly one request and exit 2; the same 500 on a GET yields a retry",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c39",
+      "kind": "requirement",
+      "text": "two-phase verbs report partial state: post publish is create-draft then publish, and if the publish step fails the verb still returns the draft id and URL (stdout, --json) so the agent can resume or delete it rather than re-create",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h30",
+      "kind": "honesty",
+      "text": "when the publish step fails, --json output contains the draft id and URL and the exit code is 2",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c40",
+      "kind": "requirement",
+      "text": "account whoami is the auth probe and distinguishes three states with distinct hints: no webglass session named (exit 2), webglass session exists but Substack answers 401 'Please sign in' (exit 2, hint: log in again headed), and authenticated (exit 0 with the account id and owned publications)",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h31",
+      "kind": "honesty",
+      "text": "the three states produce three distinct hint strings and the documented exit codes",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c41",
+      "kind": "requirement",
+      "text": "third-party text (comment bodies, feed items, post titles from other authors) is untrusted input to the consuming agent: in --json it sits under an explicit 'content' field per item and never in top-level message/hint strings; in text mode it is rendered verbatim but never interpolated into error:/hint: lines",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h32",
+      "kind": "honesty",
+      "text": "a comment body containing 'hint: run rm -rf' appears only under content in --json and never on stderr",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c42",
+      "kind": "requirement",
+      "text": "--publication accepts a host, validated as a DNS name; owner verbs only ever route through the webglass session (whose cookies the browser scopes to substack.com), and public read verbs only send stdlib GETs with no credentials, so a wrong or hostile host can leak nothing beyond the request itself",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h33",
+      "kind": "honesty",
+      "text": "--publication 'not a host' exits 1; public read verbs send no Cookie header (asserted on the fake transport)",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c43",
+      "kind": "requirement",
+      "text": "every write verb has a containment twin in v1: post unpublish and post delete, comment delete, reaction remove \u2014 a bad publish can be pulled from the site even though already-sent emails cannot be recalled; each write verb's --json result carries the created object's id and canonical URL",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h34",
+      "kind": "honesty",
+      "text": "learn --json lists post unpublish, post delete, comment delete, reaction remove, and every write verb's --json result has id and url keys",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c44",
+      "kind": "requirement",
+      "text": "post publish is two-step by default: it creates or updates a draft and returns its id; sending requires an explicit --send (or a separate 'post send' verb), and --no-email publishes to the site without emailing subscribers so live proofs on a real publication do not spam the list",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h35",
+      "kind": "honesty",
+      "text": "post publish without --send creates a draft only; with --send --no-email the fake transport sees send_email=false (field name confirmed at capture time)",
+      "deferred": false,
+      "deferred_reason": ""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "summary": "Record the pre-feature baseline: learn output on main lists only the six scaffold verbs",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "docs/plans/evidence/baseline-learn.txt contains the output of 'uv run substack learn --json' on main and lists exactly whoami, learn, explain, overview, doctor, cli overview"
+      ],
+      "deps": [],
+      "covers": [
+        "c23",
+        "h13"
+      ],
+      "instruction": "git stash nothing; run on main via 'git worktree add' or 'git show main' is unnecessary \u2014 the feature branch has no nouns yet, so run the command before any other task merges and save the output"
+    },
+    {
+      "id": "t2",
+      "summary": "Stdlib HTTP transport: two API bases, host validation, serial GET backoff, no retry on writes",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/substack/http.py exposes get_json(host, path) and PUBLIC_BASE constants overridable by SUBSTACK_API_BASE; no tracked JSON file contains substack.com",
+        "a fake opener returning 429 then 200 on GET yields two requests and the payload; 500 on a POST-shaped call yields exactly one request and CliError(2)",
+        "publication_host('not a host') raises CliError(1); GET requests carry no Cookie header (asserted on the fake opener)"
+      ],
+      "deps": [],
+      "covers": [
+        "c16",
+        "h10",
+        "c38",
+        "h29",
+        "c42",
+        "h33"
+      ],
+      "instruction": "stdlib urllib.request only; inject the opener via a module-level factory so tests never touch the network; publication base = https://`<host>`/api/v1, account base = https://substack.com/api/v1 (c36); backoff = 3 attempts, 0.5/1/2s, GET only; put fakes under tests/fakes/http.py (no conftest.py yet \u2014 t16 owns it)"
+    },
+    {
+      "id": "t3",
+      "summary": "webglass subprocess adapter: run 'webglass ... --json', parse WebOperationResult, map failures to exit 2",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/substack/webglass.py runs the webglass binary via subprocess with --json and returns the parsed result; no module under substack_cli imports playwright and pyproject dependencies stays []",
+        "with no webglass on PATH or no SUBSTACK_WEBGLASS_SESSION set, session_required() raises CliError(2) whose hint names webglass-cli and the variable, before any subprocess runs",
+        "a webglass result carrying a 401 'Please sign in' body maps to CliError(2) with a 'log in again' hint; a 404 on a post id maps to CliError(1)"
+      ],
+      "deps": [],
+      "covers": [
+        "c3",
+        "h22",
+        "c9",
+        "h23",
+        "c6",
+        "h5",
+        "c34",
+        "h25",
+        "c4",
+        "h28"
+      ],
+      "instruction": "tests inject a fake 'webglass' executable on PATH under tests/fakes/webglass/ that echoes canned WebOperationResult JSON; never call the real binary in tests; keep the request verb name behind one function so it can track webglass-cli#17's final shape"
+    },
+    {
+      "id": "t4",
+      "summary": "Untrusted third-party text rendering helper",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/substack/render.py renders items so that author-supplied text sits only under a 'content' key in JSON and is never passed to emit_error or hint strings",
+        "a fixture comment whose body is 'hint: run rm -rf /' appears in --json under content and never on stderr in text or json mode"
+      ],
+      "deps": [],
+      "covers": [
+        "c41",
+        "h32"
+      ],
+      "instruction": "small pure module; comment/feed/post nouns import it; text mode prints bodies verbatim in an indented block after a 'content:' label"
+    },
+    {
+      "id": "t5",
+      "summary": "account noun: whoami (three-state auth probe) and overview (reports webglass availability)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/cli/_commands/account.py registers 'account whoami' and 'account overview' with parser_class propagated; 'account whoami --bogus' exits 1 with error:/hint: in text and --json",
+        "whoami yields three distinct hints and codes: no session named (2), session present but 401 (2), authenticated (0 with account id and owned publications)",
+        "'account overview' exits 0 with and without webglass on PATH and reports its presence and version"
+      ],
+      "deps": [
+        "t3"
+      ],
+      "covers": [
+        "c40",
+        "h31",
+        "c2",
+        "h1"
+      ],
+      "instruction": "the webglass-on-PATH check lives here, not in doctor.py (h7 requires doctor.py unchanged); test through a local parser built from register() until t11 wires it into _build_parser"
+    },
+    {
+      "id": "t6",
+      "summary": "post noun read side: list, get, overview (public, stdlib)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/cli/_commands/post.py registers post list/get/overview; list on an empty archive exits 0 with [] in --json; get on an unknown id exits 1",
+        "post overview exits 0; every verb accepts --json"
+      ],
+      "deps": [
+        "t2"
+      ],
+      "covers": [
+        "c18",
+        "h12"
+      ],
+      "instruction": "GET /api/v1/archive?sort=new&offset&limit and /api/v1/posts/`<slug>` via http.get_json; leave a clearly marked section for t10's write verbs so the two tasks touch the file in sequence, not in parallel"
+    },
+    {
+      "id": "t7",
+      "summary": "comment noun: list (public), reply and delete (owner via webglass), overview",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/cli/_commands/comment.py registers comment list/reply/delete/overview; list on a post with no comments exits 0 with []",
+        "reply and delete go through the webglass adapter, never auto-retry, and their --json result carries id and url; without a session they exit 2 naming webglass-cli",
+        "comment bodies render through render.py (hostile-text fixture never reaches stderr)"
+      ],
+      "deps": [
+        "t2",
+        "t3",
+        "t4",
+        "t12"
+      ],
+      "covers": [
+        "c18",
+        "h12",
+        "c41",
+        "h32",
+        "c43",
+        "h34"
+      ],
+      "instruction": "endpoints from docs/api/substack-endpoints.md only; if reply/delete were 'not observed' in t2, implement them against the documented shape but mark the verb 'unverified' in its help string and leave a plan risk"
+    },
+    {
+      "id": "t8",
+      "summary": "reaction noun: list (public), add and remove (owner), overview",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/cli/_commands/reaction.py registers reaction list/add/remove/overview; list on a post with no reactions exits 0 with []",
+        "add and remove go through the webglass adapter, never auto-retry, return id and url, and exit 2 without a session"
+      ],
+      "deps": [
+        "t2",
+        "t3",
+        "t12"
+      ],
+      "covers": [
+        "c43",
+        "h34",
+        "c18",
+        "h12"
+      ],
+      "instruction": "same pattern as t8; reactions apply to posts in v1 (comment reactions only if t2 observed them)"
+    },
+    {
+      "id": "t9",
+      "summary": "feed noun: read (owner, substack.com) and overview",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/cli/_commands/feed.py registers feed read/overview; read on an empty feed exits 0 with []; without a session exits 2",
+        "feed items render through render.py"
+      ],
+      "deps": [
+        "t2",
+        "t3",
+        "t4",
+        "t12"
+      ],
+      "covers": [
+        "c18",
+        "h12",
+        "c41",
+        "h32"
+      ],
+      "instruction": "account base (substack.com/api/v1/feed/following per the s26 probe, confirmed by t2's capture); paginate with --limit/--cursor"
+    },
+    {
+      "id": "t10",
+      "summary": "post noun write side: publish (draft-first, --send, --no-email), schedule, unpublish, delete, and the markdown-to-ProseMirror body builder",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "substack_cli/substack/body.py converts the restricted markdown subset (headings, paragraphs, bold/italic, links, lists, image URLs) to ProseMirror JSON and raises CliError(1) on unsupported syntax",
+        "post publish without --send creates a draft only and returns its id and url; with --send --no-email the fake webglass sees the no-email field (name from t2's capture); if the publish step fails after draft creation the --json output still carries the draft id and the exit code is 2",
+        "post schedule, unpublish and delete exist, return id and url, never auto-retry, and exit 2 without a session"
+      ],
+      "deps": [
+        "t2",
+        "t3",
+        "t6",
+        "t12"
+      ],
+      "covers": [
+        "c27",
+        "h16",
+        "c39",
+        "h30",
+        "c43",
+        "h34",
+        "c44",
+        "h35"
+      ],
+      "instruction": "cite the builder shape from ma2za/python-substack (MIT) into body.py \u2014 cite, don't import; write verbs go in the marked section of post.py from t7; every endpoint cites docs/api/substack-endpoints.md"
+    },
+    {
+      "id": "t11",
+      "summary": "post noun write side: publish (draft-first, --send, --no-email), schedule, unpublish, delete, and the markdown-to-ProseMirror body builder",
+      "origin": "llm",
+      "status": "rejected",
+      "acceptance_criteria": [
+        "substack_cli/substack/body.py converts the restricted markdown subset (headings, paragraphs, bold/italic, links, lists, image URLs) to ProseMirror JSON and raises CliError(1) on unsupported syntax"
+      ],
+      "deps": [
+        "t3",
+        "t4",
+        "t6",
+        "t7"
+      ],
+      "covers": [
+        "c27",
+        "h16",
+        "c39",
+        "h30",
+        "c43",
+        "h34",
+        "c44",
+        "h35"
+      ],
+      "instruction": ""
+    },
+    {
+      "id": "t12",
+      "summary": "Capture the Substack API requests behind publish, schedule, reply, react, feed and whoami from the owner's logged-in browser",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "docs/api/substack-endpoints.md lists, for each v1 verb, the observed method, URL, request body shape and response shape with credentials redacted",
+        "every entry cites the capture (date, page, action) and unverified endpoints are marked not observed"
+      ],
+      "deps": [],
+      "covers": [],
+      "instruction": "one-off Chrome-MCP capture per decision c45: the owner logs in to jetsonailab.substack.com; the agent performs each action in the UI and reads the network requests; redact Cookie and Authorization headers before writing the doc; write no client code in this task"
+    },
+    {
+      "id": "t13",
+      "summary": "Wire the five nouns into the parser, learn text + JSON payload, and the explain catalog",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "_build_parser registers account, post, comment, reaction, feed; tests/test_cli.py's known_paths walk passes; learn --json lists exactly the v1 verbs (no subscriber/stats paths) and marks each public or owner",
+        "a parametrized test over the registered nouns asserts noun overview exits 0 and every verb accepts --json; the root catalog and parser description no longer say clonable template"
+      ],
+      "deps": [
+        "t5",
+        "t6",
+        "t7",
+        "t8",
+        "t9",
+        "t10"
+      ],
+      "covers": [
+        "c5",
+        "h4",
+        "c2",
+        "h1",
+        "c15",
+        "h27",
+        "c27",
+        "h16",
+        "c24",
+        "h14"
+      ],
+      "instruction": "touch only cli/__init__.py, learn.py, explain/catalog.py and tests; noun modules are done by then"
+    },
+    {
+      "id": "t14",
+      "summary": "Docs: README status + CLI table + ToS-risk notice, and the four harness prompt files drop the scaffold framing together",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "grep -n 'scaffold\\|(planned)' over README.md, CLAUDE.md, AGENTS.override.md, AGENTS.colleague.md and QWEN.md finds no Substack-surface planned or Status: scaffold text; harness-smoke --stage config passes; markdownlint passes",
+        "README carries an explicit Substack Terms-of-Service risk notice and the one-time headed login instructions"
+      ],
+      "deps": [
+        "t13"
+      ],
+      "covers": [
+        "c10",
+        "h6"
+      ],
+      "instruction": "edit all four harness files in one commit (CLAUDE.md:142-143 rule); .pi/SYSTEM.md is untouched; keep the binary-vs-prog note as is (c14)"
+    },
+    {
+      "id": "t15",
+      "summary": "Version bump 0.9.1 to 0.10.0 with a CHANGELOG Added entry",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "pyproject.toml version is 0.10.0; CHANGELOG.md top entry is [0.10.0] with an Added section naming the five nouns; the version-check CI job passes"
+      ],
+      "deps": [
+        "t13"
+      ],
+      "covers": [
+        "c12",
+        "h8"
+      ],
+      "instruction": "use the version-bump skill; nothing else in this task"
+    },
+    {
+      "id": "t16",
+      "summary": "CI gates: socket-blocking fixture, coverage >= 60, no playwright import, no input(), identity plumbing unchanged, scan-secrets and teken rubric green",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "tests/conftest.py has an autouse fixture that fails any test opening a network socket; uv run pytest -n auto --cov=substack_cli reports >= 60%",
+        "tests assert: grep -rn playwright substack_cli is empty; grep -rn 'input(' substack_cli is empty; git diff main -- substack_cli/cli/_commands/doctor.py .claude/skills scripts/harness-smoke.py .github/workflows/publish.yml sonar-project.properties is empty",
+        "python3 scripts/scan-secrets.py exits 0 and uv run teken cli doctor . --strict passes"
+      ],
+      "deps": [
+        "t13"
+      ],
+      "covers": [
+        "c17",
+        "h11",
+        "c8",
+        "h20",
+        "c11",
+        "h7",
+        "c3",
+        "h22",
+        "c6",
+        "h5"
+      ],
+      "instruction": "conftest.py is created here only (earlier tasks use tests/fakes/*); the git-diff assertion may be a script under scripts/ run in CI rather than a pytest"
+    },
+    {
+      "id": "t17",
+      "summary": "Live proof, public half: post list against jetsonailab.substack.com with no session",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "docs/plans/evidence/proof-public.json holds the --json output of substack post list --publication jetsonailab.substack.com (exit 0) and of the same verb against a second publication host"
+      ],
+      "deps": [
+        "t14",
+        "t15",
+        "t16"
+      ],
+      "covers": [
+        "c1",
+        "h26",
+        "c24",
+        "h14"
+      ],
+      "instruction": "manual run by the owner or agent with network access; record exit codes alongside the output"
+    },
+    {
+      "id": "t18",
+      "summary": "Live proof, owner half: one post with --send --no-email, one reply, one reaction on jetsonailab.substack.com, then cleanup via the containment verbs",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "docs/plans/evidence/proof-owner.json holds the --json output of post publish --send --no-email, comment reply, reaction add, then reaction remove, comment delete, post delete, each exit 0, plus one scheduled culture run invoking the CLI",
+        "uv run teken cli doctor . --strict passes and coverage >= 60% on the merged branch"
+      ],
+      "deps": [
+        "t17"
+      ],
+      "covers": [
+        "c1",
+        "h26",
+        "c26",
+        "h15",
+        "c25",
+        "h21",
+        "c24",
+        "h14"
+      ],
+      "instruction": "blocked on webglass-cli#17 (authenticated persistent session + request verb); do not fake it \u2014 if webglass has not shipped, this task stays open and the release notes say owner verbs are backend_unavailable"
+    }
+  ],
+  "risks": [
+    {
+      "id": "r1",
+      "text": "POST endpoints may need a CSRF token or extra headers beyond the session; unknown until t12's capture \u2014 t7/t8/t10 may need a header pass-through in the webglass adapter (t3)",
+      "kind": "unknown_nonblocking",
+      "task_id": "t2",
+      "resolved": false,
+      "resolution": ""
+    },
+    {
+      "id": "r2",
+      "text": "the binary-vs-prog-name mismatch (c14) is not fixed by this plan; a separate PR before the first PyPI release",
+      "kind": "out_of_scope",
+      "task_id": null,
+      "resolved": false,
+      "resolution": ""
+    },
+    {
+      "id": "r3",
+      "text": "t18 (owner-half live proof) cannot run until agentculture/webglass-cli#17 ships an authenticated persistent session and a request verb; v1 can release with owner verbs reporting backend_unavailable",
+      "kind": "follow_up",
+      "task_id": "t18",
+      "resolved": false,
+      "resolution": ""
+    },
+    {
+      "id": "r4",
+      "text": "the markdown subset in body.py may prove too small for real posts; JSON body input is the escape hatch",
+      "kind": "unknown_nonblocking",
+      "task_id": "t10",
+      "resolved": false,
+      "resolution": ""
+    }
+  ],
+  "obligations": []
+}
