@@ -27,6 +27,11 @@ renamed `convertible`. guildmaster's re-broadcast still carries the old
 `outsource` name, so `ask-colleague` is vendored **directly from colleague** as a
 tracked local divergence (see [below](#local-divergence--outsource--ask-colleague-2026-06-06)).
 
+The ledger below covers all 19 vendored skill directories: 17 from
+guildmaster (8 of them devague-origin re-broadcasts), `ask-colleague`
+direct from colleague, and — added 2026-09-12 — `recall` / `remember`,
+which were on disk but unlisted here until then.
+
 Every vendored `SKILL.md` carries `type: command`. substack-cli
 declares a culture agent (`culture.yaml`, `backend: claude`), and
 `core.skill_loader` silently skips any `SKILL.md` lacking `type:` — so the field
@@ -42,6 +47,8 @@ is load-bearing, even where guildmaster's upstream copy omits it.
 | `pypi-maintainer` | `../guildmaster/.claude/skills/pypi-maintainer/` | guildmaster | Switch a package install between PyPI / TestPyPI / local editable (`scripts/switch-source.sh`). Verbatim except added `type: command`. | 2026-05-26 (guildmaster 0.6.0) |
 | `run-tests` | `../guildmaster/.claude/skills/run-tests/` | guildmaster | pytest + xdist + coverage (`scripts/test.sh`). Verbatim except added `type: command`. | 2026-05-26 (guildmaster 0.6.0) |
 | `sonarclaude` | `../guildmaster/.claude/skills/sonarclaude/` | guildmaster | SonarCloud API queries (`scripts/sonar.sh`). Verbatim except added `type: command`. | 2026-05-26 (guildmaster 0.6.0) |
+| `recall` | `../guildmaster/.claude/skills/recall/` | guildmaster | Search the shared `eidetic` memory store (`scripts/recall.sh`). Consumer-identifying prose adapted: the personal-scope literal (`--scope guildmaster` → `--scope substack-cli`) in the description and the scope section; the wrapper itself resolves the scope from `culture.yaml` at runtime, so no nick is hard-coded in the script. One local divergence: a bare ``` fence where upstream has ```text. Note the SKILL.md frontmatter still describes eidetic's *upstream* private/`$HOME` default — `scripts/remember.sh` overrides it to `--visibility public`, which is why this repo's records land in the committed `<repo>/.eidetic/memory`. | 2026-09-12 (guildmaster 0.26.4) |
+| `remember` | `../guildmaster/.claude/skills/remember/` | guildmaster | Ingest records into the shared `eidetic` store (`scripts/remember.sh`). Same consumer-prose adaptation as `recall` (scope literal only). The script carries an explicit **policy override** over eidetic's upstream default — a plain `/remember` is `--visibility public` and lands in `<repo>/.eidetic/memory`, committed and mesh-shared; `--visibility private` routes to `$HOME` instead. | 2026-09-12 (guildmaster 0.26.4) |
 | `think` | `../guildmaster/.claude/skills/think/` | **devague** (re-broadcast via guildmaster) | idea→spec leg of the devague workflow chain. Verbatim (already carried `type: command` at guildmaster). Origin/broadcast prose left verbatim. | 2026-09-05 (devague 0.24.1 via guildmaster) |
 | `spec-to-plan` | `../guildmaster/.claude/skills/spec-to-plan/` | **devague** (re-broadcast via guildmaster) | spec→plan leg of the devague workflow chain. Verbatim (already carried `type: command`). | 2026-09-05 (devague 0.24.1 via guildmaster) |
 | `assign-to-workforce` | `../guildmaster/.claude/skills/assign-to-workforce/` | **devague** (re-broadcast via guildmaster) | plan→parallel-implementation leg of the devague workflow chain. Verbatim (already carried `type: command`). | 2026-09-05 (devague 0.24.1 via guildmaster) |

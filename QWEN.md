@@ -9,11 +9,18 @@ Qwen Code session.
 
 ## What this project is
 
-`substack-cli` is a **clonable template for AgentCulture mesh agents**.
-It is a working, minimal example of the sibling pattern every Culture agent
-follows: an agent-first CLI, a mesh identity, the canonical skill kit, and a
-buildable/deployable package baseline. Clone it, rename the package, edit
-`culture.yaml`, and you have a new agent that `steward doctor` recognizes.
+`substack-cli` is an **agent-first CLI to manage a Substack publication and
+account** *(planned — see Status below)* — publish and schedule posts, read
+posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
+affiliated with Substack.
+
+**Status: scaffold.** None of that domain surface exists on disk yet. What is
+checked in today is the AgentCulture sibling baseline this repo was scaffolded
+from (`culture-agent-template`): the agent-first CLI skeleton (`whoami`,
+`learn`, `explain`, `overview`, `doctor`, `cli overview`), a mesh identity, the
+vendored guildmaster skill kit, and a buildable/deployable package baseline.
+The Substack nouns and verbs are the work ahead. Do not describe them as
+existing, and do not assume a hidden module implements them — read the tree.
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the **skills supplier**), [`steward`](https://github.com/agentculture/steward)
@@ -28,11 +35,16 @@ This repo's root carries one prompt file per agent harness, each read by
 exactly one of them — there is no shared base file for them to inherit from:
 
 - **Claude Code** → [`CLAUDE.md`](CLAUDE.md) (the fullest write-up; read it
-  first if you are new to the repo).
+  first if you need more than fits here).
 - **Pi / associate** → [`AGENTS.override.md`](AGENTS.override.md) for context,
   plus [`.pi/SYSTEM.md`](.pi/SYSTEM.md) for its system prompt.
 - **colleague** → [`AGENTS.colleague.md`](AGENTS.colleague.md).
 - **Qwen Code** → this file.
+
+`.qwen/skills` is a relative symlink onto `.claude/skills`, so a Qwen Code
+session loads the same one skill tree the other harnesses are wired to — no
+forked copies. (Wiring is shared; loading is not universal — colleague 1.76.0
+loads 0 of the 19 for upstream reasons, see `docs/harness-verification.md`.)
 
 ## Identity
 
@@ -45,80 +57,136 @@ agents:
 ```
 
 `backend: claude` fixes the *mesh resident* prompt file to `CLAUDE.md` — the
-mesh runtime reads that file, not this one. A Qwen Code session working in a
-clone of this repo is a separate, local tool session; it reads `QWEN.md`
-regardless of what `culture.yaml` declares, and running Qwen Code here neither
-requires nor changes that declaration. The declaration and the resident prompt
-together satisfy the two invariants `steward doctor` verifies:
+mesh runtime reads that file, not this one. A Qwen Code session working in this
+clone is a separate, local tool session; it reads `QWEN.md` regardless of what
+`culture.yaml` declares, and running Qwen Code here neither requires nor
+changes that declaration. The declaration and the resident prompt together
+satisfy the two invariants `steward doctor` verifies:
 **prompt-file-present** and **backend-consistency** (`claude` ↔ `CLAUDE.md`).
 
-## Cloning this template (re-initialization)
+## Commands
 
-When you start a new agent from this template:
+```bash
+uv sync                                  # install deps (dev group included)
 
-1. Rename the package directory `substack_cli/` → `<your_module>/`
-   and replace `substack_cli` (module) / `substack-cli`
-   (CLI and dist name) throughout `pyproject.toml`, the package, `tests/`,
-   `sonar-project.properties`, and `README.md`. The name is hard-coded in
-   ~100 places, so list every occurrence first rather than renaming by hand
-   (`git grep` is portable and skips `.git` / untracked `__pycache__`):
+uv run substack whoami                   # note: the binary is `substack`
+uv run substack learn --json
+uv run substack doctor
 
-   ```bash
-   git grep -nF -e 'substack-cli' -e 'substack_cli'
-   ```
+uv run pytest -n auto                    # full suite, parallel
+uv run pytest tests/test_cli.py -v       # one file
+uv run pytest tests/test_cli.py::test_whoami_text -v   # one test
+uv run pytest -n auto --cov=substack_cli --cov-report=term   # coverage (fail_under=60)
 
-2. Set your `suffix` (and `backend`) in `culture.yaml`. `whoami` and `doctor`
-   then reflect the new identity with no further code change.
-3. Rewrite `CLAUDE.md` (and this file, and the other two harness files) to
-   describe your agent.
-4. Re-vendor the skill kit you need from guildmaster (see
-   `docs/skill-sources.md`) — keep only the skills your agent uses.
+uv run black substack_cli tests          # CI runs --check
+uv run isort substack_cli tests          # CI runs --check-only
+uv run flake8 substack_cli tests         # line length 100
+uv run bandit -c pyproject.toml -r substack_cli
+# markdownlint-cli2 is npm, not uv: npm install -g markdownlint-cli2@0.21.0
+markdownlint-cli2 "**/*.md" "#node_modules" "#.local" "#.claude/skills" "#.teken"
+python3 scripts/scan-secrets.py          # committed-secret / non-localhost-endpoint gate
+uv run teken cli doctor . --strict       # the agent-first rubric gate CI enforces
+uv run python scripts/harness-smoke.py --stage all --require config
+```
 
-## The CLI
+**Binary vs. prog name.** `[project.scripts]` installs the command as
+**`substack`**, while the argparse `prog` (and every doc, catalog entry and
+help string) says `substack-cli`. Prose of the form `substack-cli whoami` is
+the *logical* command name; what you actually type is `uv run substack whoami`
+(or `python -m substack_cli`).
+
+## The CLI contract
 
 The CLI is cited (cite-don't-import) from teken's `python-cli` reference
 (`teken cli cite`), so the runtime package has **no third-party dependencies**;
-`teken` (a.k.a. `afi-cli`) is a dev dependency only. Agent-first verbs:
+`teken` (a.k.a. `afi-cli`) is a dev dependency only, and `culture.yaml` is
+parsed by hand in `_commands/whoami.py` rather than pulling in PyYAML. Keep it
+that way when you add domain verbs — a Substack HTTP client belongs behind an
+optional extra or in the stdlib, not in `dependencies`.
 
-- `substack-cli whoami` — identity from `culture.yaml`.
-- `substack-cli learn` — structured self-teaching prompt.
-- `substack-cli explain <path>` — markdown docs for any noun/verb.
-- `substack-cli overview` — descriptive snapshot of the agent.
-- `substack-cli doctor` — check the agent-identity invariants.
-- `substack-cli cli overview` — describe the CLI surface itself.
+Verbs today: `whoami`, `learn`, `explain <path>`, `overview`, `doctor`,
+`cli overview`.
 
-Conventions: every command supports `--json`; results go to stdout, errors and
-diagnostics to stderr (never mixed); exit codes are `0` success, `1` user
-error, `2` environment error, `3+` reserved. The agent-first rubric is
-enforced in CI by `teken cli doctor . --strict`.
+The wiring that spans files:
+
+- `substack_cli/cli/__init__.py` — parser, dispatch, error contract.
+  `_CliArgumentParser` overrides `.error()` so even *argparse* failures
+  (unknown verb, missing arg) render as the structured `error:` / `hint:` pair
+  and exit `1`, not argparse's default exit `2`. Parse-time errors happen
+  before `args.json` exists, so `main()` peeks at raw argv for `--json` and
+  stashes it on the class-level `_json_hint`. Pass
+  `parser_class=_CliArgumentParser` to every `add_subparsers()` call (see
+  `_commands/cli.py`) or a nested noun drops out of the contract silently.
+  `_dispatch()` wraps any non-`CliError` exception so no traceback reaches
+  stderr.
+- `substack_cli/cli/_errors.py` — `CliError(code, message, remediation)` plus
+  the exit-code policy: `0` success, `1` user error, `2` environment error,
+  `3+` reserved. Every *command handler* raises `CliError` on failure; two
+  paths differ downstream by design — `_CliArgumentParser.error()` emits a
+  `CliError` then raises `SystemExit`, and `doctor` *returns* `1` for an
+  unhealthy report rather than raising.
+- `substack_cli/cli/_output.py` — results to **stdout**, errors and diagnostics
+  to **stderr**, never mixed, in both text and JSON mode.
+- `substack_cli/cli/_commands/*.py` — one module per verb/noun, each exposing
+  `register(sub)`; register new noun groups in `_build_parser()` at the marked
+  comment.
+- `substack_cli/explain/catalog.py` — markdown keyed by command-path tuple.
+  `tests/test_cli.py` walks `known_paths()`, so an unregistered or
+  uncatalogued path fails the suite.
+
+Rubric rules CI enforces via `teken cli doctor . --strict`: every command takes
+`--json`; any noun with action-verbs must also expose `overview`; descriptive
+verbs never hard-fail on a bad target (`overview /no/such/path` exits `0`);
+`learn` must keep covering purpose, command map, exit codes, `--json`, and
+`explain`.
+
+## Adding the Substack surface (planned)
+
+A new noun is a module under `cli/_commands/` with `register(sub)`, a line in
+`_build_parser()`, a catalog entry in `explain/catalog.py`, a row in `learn.py`'s
+text **and** JSON payload, and tests. Credentials (Substack session cookies or
+API tokens) come from the environment — `scripts/scan-secrets.py` runs in CI
+and fails on committed credentials and non-localhost endpoints.
 
 ## Skills
 
-`.claude/skills/` vendors the **canonical guildmaster skill kit**
-(cite-don't-import). Provenance and the re-sync procedure live in
-`docs/skill-sources.md`. Do not reformat or edit vendored scripts — re-sync
-from guildmaster instead.
+`.claude/skills/` vendors 19 skills, cite-don't-import, reachable here through
+the `.qwen/skills` symlink: 17 from guildmaster (eight of those devague-origin
+re-broadcasts) and `ask-colleague` direct from `colleague`. Provenance and the
+re-sync procedure live in `docs/skill-sources.md` — check a skill's row there
+before assuming guildmaster is its upstream. Do not
+reformat or edit vendored scripts — a fix belongs upstream, then re-sync. Every
+vendored `SKILL.md` needs `type: command`; `core.skill_loader` silently skips
+one without it.
 
 ## Conventions
 
 - **Every PR bumps the version** — even docs/config/CI. Use the
   `version-bump` skill; the `version-check` CI job blocks merge otherwise.
-- **Tests**: `uv run pytest -n auto`. **Lint**: black, isort, flake8 (line
-  length 100), bandit, markdownlint.
+- **Four harnesses, four files.** If you change a convention in this file,
+  change it in `CLAUDE.md`, `AGENTS.override.md` and `AGENTS.colleague.md` too
+  — CI's `harness-smoke` job fails when any one of the four configs breaks.
+- `doctor`'s `_PROMPT_FILE` table and
+  `.claude/skills/agent-config/data/backend-fingerprints.yaml` are two copies
+  of one registry; `tests/test_harness_registries.py` fails if they drift.
+  `_PROMPT_FILE` (recognition — does *some* harness on this backend read this
+  file?) and `_RESIDENT_PROMPT` (health — does the *daemon's* file exist?) are
+  deliberately different tables; don't collapse them.
 - **Deploy**: pushing to `main` publishes to PyPI via Trusted Publishing
   (`.github/workflows/publish.yml`); PRs do a TestPyPI dry-run.
 
 ## Layout
 
 ```text
-substack_cli/   agent-first CLI (cited from teken's python-cli reference)
+substack_cli/             agent-first CLI (cited from teken's python-cli reference)
   cli/                    parser, error/output contract, _commands/ (verbs)
   explain/                markdown catalog for `explain`
-tests/                    pytest smoke + introspection tests
+tests/                    CLI smoke, introspection, harness-registry, script tests
+scripts/                  scan-secrets.py, harness-smoke.py (both CI gates)
 .claude/skills/           vendored guildmaster skill kit (cite-don't-import)
-docs/skill-sources.md     skill provenance ledger
+docs/                     skill provenance + the four-harness contract/verification
 culture.yaml              mesh identity (suffix + backend)
-.github/workflows/        tests + deploy (PyPI Trusted Publishing)
+.github/workflows/        tests.yml (test/lint/harness-smoke/version-check), publish.yml
 ```
 
 This file describes the repository **as it exists on disk today**. When you

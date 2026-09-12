@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-09-12
+
+### Changed
+
+- **`CLAUDE.md` re-initialized from the scaffold seed into a full runtime prompt** — `/init` grounded in this repo: command block (tests, single test, every lint/rubric/smoke gate), the cross-file CLI wiring (`_CliArgumentParser.error()` override, the `_json_hint` argv peek, the `parser_class` propagation trap, `CliError`, the stdout/stderr split, the catalog walked by `tests/test_cli.py`), a five-place checklist for adding a Substack noun, and the `_PROMPT_FILE` vs `_RESIDENT_PROMPT` distinction.
+- **All four harness prompt files now describe this repo rather than the template it was scaffolded from.** `QWEN.md` carries the coding-session machinery; `AGENTS.override.md` stays context-only for Pi's non-coding lane and tells it to report the scaffold gap instead of inferring an implementation; `AGENTS.colleague.md` is rewritten around colleague as the `/ask-colleague` second mind (per-verb expectations, the contracts a diff must respect, the colleague#494 empty-skills caveat).
+- `README.md` reframed from template-clone instructions to this repo's own Status / CLI / Development sections; the clone-and-rename procedure is dropped now that the clone exists.
+
+### Fixed
+
+- Docs claimed a Substack surface (posts, comments, statistics, subscribers) that does not exist on disk. Every harness file and the README now state the scaffold status explicitly.
+- `README.md` quickstart used `uv run substack-cli …`, which does not run — `[project.scripts]` installs the binary as `substack`. Quickstart corrected and the binary-vs-prog-name mismatch documented in all four harness files pending a code-side fix.
+- Skill count corrected from 11 to 19 in `README.md` (and stated once in each harness file).
+- `README.md` and `AGENTS.override.md` both called `CLAUDE.md` "the fullest write-up of the repo's conventions" and pointed at a "Cloning this template" section it did not contain, while `CLAUDE.md` was still the `/init` seed placeholder.
+
 ## [0.9.0] - 2026-09-06
 
 ### Added
