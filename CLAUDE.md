@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** — publish and schedule posts, read posts and comments, run audience
-and post statistics, and manage subscribers. Unofficial community tool, not
+account** *(planned — see Status below)* — publish and schedule posts, read
+posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
 affiliated with Substack.
 
 **Status: scaffold.** None of that domain surface exists on disk yet. What is
@@ -15,7 +15,7 @@ from (`culture-agent-template`): the agent-first CLI skeleton (`whoami`,
 `learn`, `explain`, `overview`, `doctor`, `cli overview`), a mesh identity, the
 vendored guildmaster skill kit, and a buildable/deployable package baseline.
 The Substack nouns/verbs are the work ahead — see
-[Adding the Substack surface](#adding-the-substack-surface).
+[Adding the Substack surface](#adding-the-substack-surface-planned).
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the **skills supplier**), [`steward`](https://github.com/agentculture/steward)
@@ -42,6 +42,7 @@ uv run black substack_cli tests          # CI runs --check
 uv run isort substack_cli tests          # CI runs --check-only
 uv run flake8 substack_cli tests         # line length 100
 uv run bandit -c pyproject.toml -r substack_cli
+# markdownlint-cli2 is npm, not uv: npm install -g markdownlint-cli2@0.21.0
 markdownlint-cli2 "**/*.md" "#node_modules" "#.local" "#.claude/skills" "#.teken"
 python3 scripts/scan-secrets.py          # committed-secret / non-localhost-endpoint gate
 uv run teken cli doctor . --strict       # the agent-first rubric gate CI enforces
@@ -77,7 +78,10 @@ The wiring that spans files, and matters before you add a verb:
   stderr.
 - `substack_cli/cli/_errors.py` — `CliError(code, message, remediation)` and the
   exit-code policy (`0` success, `1` user error, `2` environment error, `3+`
-  reserved). Every failure path raises `CliError`.
+  reserved). Every *command handler* raises `CliError` on failure. Two paths
+  deliberately differ downstream: `_CliArgumentParser.error()` emits a
+  `CliError` and then raises `SystemExit`, and `doctor` *returns* `1` for an
+  unhealthy report (an unhealthy agent is a result, not a CLI failure).
 - `substack_cli/cli/_output.py` — the strict stream split: **results to stdout,
   errors and diagnostics to stderr, never mixed**, in both text and JSON mode.
 - `substack_cli/cli/_commands/*.py` — one module per verb/noun, each exposing
@@ -93,7 +97,7 @@ every command takes `--json`; any noun with action-verbs must also expose
 /no/such/path` exits `0` — see `_commands/overview.py`). `learn` must keep
 covering purpose, command map, exit codes, `--json`, and `explain`.
 
-## Adding the Substack surface
+## Adding the Substack surface (planned)
 
 Work forwards from the existing shape, not around it: a new noun is a module
 under `cli/_commands/` with `register(sub)`, a line in `_build_parser()`, a
@@ -126,9 +130,12 @@ shared `AGENTS.md` base for them to cascade from:
 
 `AGENTS.override.md` exists specifically so Pi does **not** inherit this file.
 `.qwen/skills`, `.colleague/skills` and `.pi/skills` are relative symlinks onto
-`.claude/skills` — one skill tree, four loaders. Forcing a harness is
-invocation-level only (flags to one process); never rewrite `culture.yaml` to
-do it — see `docs/harness-invocations.yaml` (source of truth),
+`.claude/skills` — one skill tree, wired to all four harnesses. Three of them
+load it; colleague 1.76.0 loads 0 of the 19 for upstream reasons
+([colleague#494](https://github.com/agentculture/colleague/issues/494),
+`docs/harness-verification.md`), so the wiring is shared but the loading is
+not. Forcing a harness is invocation-level only (flags to one process); never
+rewrite `culture.yaml` to do it — see `docs/harness-invocations.yaml` (source of truth),
 `docs/automation-contract.md`, and `docs/harness-selection.md`.
 
 **When you edit this file, update the other three too.** They restate the same
@@ -142,10 +149,11 @@ deliberately different tables; don't collapse them.
 
 ## Skills
 
-`.claude/skills/` vendors the canonical guildmaster skill kit (19 skills,
-cite-don't-import). Provenance and the re-sync procedure live in
-`docs/skill-sources.md`; eight skills originate in `devague` and `ask-colleague`
-is vendored directly from `colleague` as a tracked divergence. Every vendored
+`.claude/skills/` vendors 19 skills, cite-don't-import: 17 from guildmaster
+(eight of those devague-origin re-broadcasts) and `ask-colleague` direct from
+`colleague` as a tracked divergence. Provenance and the re-sync procedure live
+in `docs/skill-sources.md` — check a skill's row there before assuming
+guildmaster is its upstream. Every vendored
 `SKILL.md` needs `type: command` — `core.skill_loader` silently skips one
 without it. Tooling prerequisites: **`devex`** on PATH (the `cicd` skill
 delegates the PR lifecycle to `devex pr`), **`agtag`** on PATH (the

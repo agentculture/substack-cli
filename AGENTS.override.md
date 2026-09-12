@@ -20,8 +20,8 @@ what the repo is and how it is laid out, not who is reading it.
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** — publish and schedule posts, read posts and comments, run audience
-and post statistics, and manage subscribers. Unofficial community tool, not
+account** *(planned — see Status below)* — publish and schedule posts, read
+posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
 affiliated with Substack.
 
 **Status: scaffold — and this matters for every answer you give about the

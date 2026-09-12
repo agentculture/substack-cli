@@ -10,8 +10,8 @@ Qwen Code session.
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** — publish and schedule posts, read posts and comments, run audience
-and post statistics, and manage subscribers. Unofficial community tool, not
+account** *(planned — see Status below)* — publish and schedule posts, read
+posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
 affiliated with Substack.
 
 **Status: scaffold.** None of that domain surface exists on disk yet. What is
@@ -42,8 +42,9 @@ exactly one of them — there is no shared base file for them to inherit from:
 - **Qwen Code** → this file.
 
 `.qwen/skills` is a relative symlink onto `.claude/skills`, so a Qwen Code
-session loads the same one skill tree the other three harnesses do — no forked
-copies.
+session loads the same one skill tree the other harnesses are wired to — no
+forked copies. (Wiring is shared; loading is not universal — colleague 1.76.0
+loads 0 of the 19 for upstream reasons, see `docs/harness-verification.md`.)
 
 ## Identity
 
@@ -81,6 +82,7 @@ uv run black substack_cli tests          # CI runs --check
 uv run isort substack_cli tests          # CI runs --check-only
 uv run flake8 substack_cli tests         # line length 100
 uv run bandit -c pyproject.toml -r substack_cli
+# markdownlint-cli2 is npm, not uv: npm install -g markdownlint-cli2@0.21.0
 markdownlint-cli2 "**/*.md" "#node_modules" "#.local" "#.claude/skills" "#.teken"
 python3 scripts/scan-secrets.py          # committed-secret / non-localhost-endpoint gate
 uv run teken cli doctor . --strict       # the agent-first rubric gate CI enforces
@@ -119,7 +121,10 @@ The wiring that spans files:
   stderr.
 - `substack_cli/cli/_errors.py` — `CliError(code, message, remediation)` plus
   the exit-code policy: `0` success, `1` user error, `2` environment error,
-  `3+` reserved. Every failure path raises `CliError`.
+  `3+` reserved. Every *command handler* raises `CliError` on failure; two
+  paths differ downstream by design — `_CliArgumentParser.error()` emits a
+  `CliError` then raises `SystemExit`, and `doctor` *returns* `1` for an
+  unhealthy report rather than raising.
 - `substack_cli/cli/_output.py` — results to **stdout**, errors and diagnostics
   to **stderr**, never mixed, in both text and JSON mode.
 - `substack_cli/cli/_commands/*.py` — one module per verb/noun, each exposing
@@ -135,7 +140,7 @@ verbs never hard-fail on a bad target (`overview /no/such/path` exits `0`);
 `learn` must keep covering purpose, command map, exit codes, `--json`, and
 `explain`.
 
-## Adding the Substack surface
+## Adding the Substack surface (planned)
 
 A new noun is a module under `cli/_commands/` with `register(sub)`, a line in
 `_build_parser()`, a catalog entry in `explain/catalog.py`, a row in `learn.py`'s
@@ -145,9 +150,11 @@ and fails on committed credentials and non-localhost endpoints.
 
 ## Skills
 
-`.claude/skills/` vendors the **canonical guildmaster skill kit** (19 skills,
-cite-don't-import), reachable here through the `.qwen/skills` symlink.
-Provenance and the re-sync procedure live in `docs/skill-sources.md`. Do not
+`.claude/skills/` vendors 19 skills, cite-don't-import, reachable here through
+the `.qwen/skills` symlink: 17 from guildmaster (eight of those devague-origin
+re-broadcasts) and `ask-colleague` direct from `colleague`. Provenance and the
+re-sync procedure live in `docs/skill-sources.md` — check a skill's row there
+before assuming guildmaster is its upstream. Do not
 reformat or edit vendored scripts — a fix belongs upstream, then re-sync. Every
 vendored `SKILL.md` needs `type: command`; `core.skill_loader` silently skips
 one without it.

@@ -25,8 +25,9 @@ checked-in reality; the post/subscriber/stats verbs are the work ahead.
   one of them (see [Prompt files by harness](#prompt-files-by-harness) below).
   All four harnesses are usable interactively regardless of which one
   `culture.yaml` names as the mesh resident.
-- **The canonical guildmaster skill kit** (19 skills) under `.claude/skills/`,
-  vendored cite-don't-import. See [`docs/skill-sources.md`](docs/skill-sources.md).
+- **19 vendored skills** under `.claude/skills/`, cite-don't-import — 17 from
+  guildmaster (eight of those devague-origin re-broadcasts) and `ask-colleague`
+  direct from `colleague`. See [`docs/skill-sources.md`](docs/skill-sources.md).
 - **A build + deploy baseline** — pytest, lint, the agent-first rubric gate, a
   committed-secret scanner, a per-harness smoke check, and PyPI Trusted
   Publishing wired into GitHub Actions.

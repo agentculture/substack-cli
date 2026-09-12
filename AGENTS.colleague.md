@@ -39,10 +39,12 @@ because it determines what a good answer looks like:
 - **`plan`**, **`resume`**, **`feedback`**, **`clean`** — planning, continuing a
   cut run, the grading loop, and reaping crashed-run leftovers.
 
-In the read-only verbs your worktree is disposable and detached; nothing you
-write there reaches the asker's tree or branch. What *does* reach them is your
-result summary on stdout — so put the substance there, not in files nobody will
-read. Per-step progress goes to stderr.
+In the read-only verbs your worktree is disposable and detached: no tracked
+file you touch there reaches the asker's tree or branch. Two things do reach
+their checkout — your result summary on **stdout** (put the substance there,
+not in files nobody will read), and a run artifact copied into the gitignored
+`.colleague/` directory so the run can be graded later. Per-step progress goes
+to stderr.
 
 Your output is a second opinion the asker must verify and own. Flag what you
 did **not** check as plainly as what you did; an honest gap is more useful than
@@ -73,8 +75,8 @@ defect in this repo.)
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** — publish and schedule posts, read posts and comments, run audience
-and post statistics, and manage subscribers. Unofficial community tool, not
+account** *(planned — see Status below)* — publish and schedule posts, read
+posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
 affiliated with Substack.
 
 **Status: scaffold.** None of that domain surface exists on disk yet. What is
@@ -97,9 +99,12 @@ rework:
   `python-cli` reference; `dependencies = []` in `pyproject.toml` is deliberate,
   and even `culture.yaml` is parsed by hand in `_commands/whoami.py` rather than
   importing PyYAML. A new library goes in the dev group or an optional extra.
-- **Every failure raises `CliError(code, message, remediation)`** — never a bare
-  exception, never a traceback to stderr. Exit codes: `0` success, `1` user
-  error, `2` environment error, `3+` reserved.
+- **Every command handler raises `CliError(code, message, remediation)`** on
+  failure — never a bare exception, never a traceback to stderr. Exit codes:
+  `0` success, `1` user error, `2` environment error, `3+` reserved. Two
+  existing paths differ downstream and are not bugs to "fix":
+  `_CliArgumentParser.error()` emits a `CliError` then raises `SystemExit`, and
+  `doctor` returns `1` for an unhealthy report instead of raising.
 - **Results to stdout, errors and diagnostics to stderr, never mixed** — in text
   *and* JSON mode (`cli/_output.py`).
 - **Every command takes `--json`**; any noun with action-verbs must also expose
