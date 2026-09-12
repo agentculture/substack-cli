@@ -4,7 +4,7 @@
   "schema_version": 6,
   "status": "exported",
   "created": "2026-09-12T18:40:14Z",
-  "updated": "2026-09-12T20:39:50Z",
+  "updated": "2026-09-12T21:12:36Z",
   "claims": [
     {
       "id": "c1",
@@ -133,7 +133,7 @@
     {
       "id": "c6",
       "kind": "boundary",
-      "text": "credentials (the Substack session cookie / login secret) come only from environment variables or a gitignored local file; scripts/scan-secrets.py fails CI on committed credential-shaped strings, and its endpoint check fails any non-localhost http(s) URL under url/endpoint/host/baseUrl keys in JSON files \u2014 so no checked-in JSON config may carry https://substack.com",
+      "text": "substack-cli holds no Substack credential at all: the only auth input is a webglass session id; scripts/scan-secrets.py still fails CI on committed credential-shaped strings and on non-localhost URLs under url/endpoint/host/baseUrl keys in JSON files, so no checked-in JSON config may carry https://substack.com",
       "origin": "llm",
       "status": "confirmed",
       "honesty_conditions": [
@@ -147,7 +147,13 @@
       "hard_questions": [],
       "links": [],
       "instruction": "run the script; grep -l substack.com -- '*.json'",
-      "revisions": []
+      "revisions": [
+        {
+          "text": "credentials (the Substack session cookie / login secret) come only from environment variables or a gitignored local file; scripts/scan-secrets.py fails CI on committed credential-shaped strings, and its endpoint check fails any non-localhost http(s) URL under url/endpoint/host/baseUrl keys in JSON files \u2014 so no checked-in JSON config may carry https://substack.com",
+          "kind": "boundary",
+          "reason": "challenge pass: 'session cookie from environment variables' is stale after the webglass decision"
+        }
+      ]
     },
     {
       "id": "c7",
@@ -276,14 +282,20 @@
     {
       "id": "c13",
       "kind": "assumption",
-      "text": "credentials live in environment variables (and optionally a gitignored .env, already covered by .gitignore); no new ignore pattern is needed unless a repo-local config file is introduced, and that decision is deferred until the auth design is settled",
+      "text": "no credential file or ignore pattern is needed: the CLI's inputs are a webglass session id, a publication host and post/comment ids; the browser profile lives under webglass's own state dir, outside this repo",
       "origin": "llm",
       "status": "confirmed",
       "honesty_conditions": [],
       "hard_questions": [],
       "links": [],
       "instruction": "",
-      "revisions": []
+      "revisions": [
+        {
+          "text": "credentials live in environment variables (and optionally a gitignored .env, already covered by .gitignore); no new ignore pattern is needed unless a repo-local config file is introduced, and that decision is deferred until the auth design is settled",
+          "kind": "assumption",
+          "reason": "challenge pass: '.env with cookies' is stale after the webglass decision"
+        }
+      ]
     },
     {
       "id": "c14",
@@ -426,14 +438,20 @@
     {
       "id": "c20",
       "kind": "assumption",
-      "text": "the endpoint map is taken as leads from python-substack (drafts create/publish/schedule, MIT, active) and AnthonyDavidAdams/substack-api-reference (129 endpoints incl. comments, reactions, notes, subscribers, stats), then confirmed by a DevTools network capture against jetsonailab.substack.com before any client code is written; unverified paths are never shipped",
+      "text": "the endpoint map is taken as leads from python-substack (drafts create/publish/schedule, MIT, active) and AnthonyDavidAdams/substack-api-reference (129 endpoints incl. comments, reactions, notes, subscribers, stats), then confirmed by an observed request capture against jetsonailab.substack.com (mechanism per the open capture question) before any client code is written; unverified paths are never shipped",
       "origin": "llm",
       "status": "confirmed",
       "honesty_conditions": [],
       "hard_questions": [],
       "links": [],
       "instruction": "",
-      "revisions": []
+      "revisions": [
+        {
+          "text": "the endpoint map is taken as leads from python-substack (drafts create/publish/schedule, MIT, active) and AnthonyDavidAdams/substack-api-reference (129 endpoints incl. comments, reactions, notes, subscribers, stats), then confirmed by a DevTools network capture against jetsonailab.substack.com before any client code is written; unverified paths are never shipped",
+          "kind": "assumption",
+          "reason": "challenge pass: 'DevTools' contradicted the v1 resolution; the capture mechanism is now an open question"
+        }
+      ]
     },
     {
       "id": "c21",
@@ -583,14 +601,20 @@
     {
       "id": "c29",
       "kind": "decision",
-      "text": "authentication is delegated to a Playwright-controlled browser: the owner logs in once in a persistent Chromium profile and the CLI trusts that profile's session for every API call",
+      "text": "authentication is delegated to a browser the owner logged into once (a persistent Chromium profile); the CLI trusts that browser's session for every API call and never handles email/password \u2014 realised through webglass-cli sessions per c33",
       "origin": "user",
       "status": "confirmed",
       "honesty_conditions": [],
       "hard_questions": [],
       "links": [],
       "instruction": "substack account whoami exits 2 with a 'log in once in the profile' hint when the profile has no Substack session",
-      "revisions": []
+      "revisions": [
+        {
+          "text": "authentication is delegated to a Playwright-controlled browser: the owner logs in once in a persistent Chromium profile and the CLI trusts that profile's session for every API call",
+          "kind": "decision",
+          "reason": "challenge pass: c29 still said 'Playwright-controlled' and 'reuses that profile's cookies', contradicting c33 (no Playwright in substack-cli)"
+        }
+      ]
     },
     {
       "id": "c30",
@@ -658,6 +682,205 @@
       "links": [],
       "instruction": "CI test job has no webglass on PATH; run the full suite there",
       "revisions": []
+    },
+    {
+      "id": "c35",
+      "kind": "assumption",
+      "text": "webglass-cli 0.8.3 has no network lens (page inspect offers outline/controls/metadata/console/structure only), so endpoint discovery on the logged-in publication needs either a network lens added to webglass (extend webglass-cli#17) or a one-off DevTools/Chrome-MCP capture; webglass alone cannot observe the SPA's XHR calls today",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "",
+      "revisions": []
+    },
+    {
+      "id": "c36",
+      "kind": "assumption",
+      "text": "there are two API bases, not one: publication-scoped verbs (post, comment, reaction on posts) hit https://`<publication-host>`/api/v1, while account-scoped verbs (feed read, notes, account whoami) hit https://substack.com/api/v1; --publication selects the former and the session implies the latter; publications on custom domains are addressed by their host, unverified",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "",
+      "revisions": [
+        {
+          "text": "there are two API bases, not one: publication-scoped verbs (post, comment, reaction on posts) hit https://<publication-host>/api/v1, while account-scoped verbs (feed read, notes, account whoami) hit https://substack.com/api/v1; --publication selects the former and the session implies the latter; publications on custom domains are addressed by their host, unverified",
+          "kind": "assumption",
+          "reason": "markdown lint MD033: backtick the placeholder"
+        }
+      ]
+    },
+    {
+      "id": "c37",
+      "kind": "assumption",
+      "text": "post bodies are ProseMirror JSON; 'publish from markdown' means converting a restricted markdown subset (headings, paragraphs, bold/italic, links, lists, images by URL) through a builder cited from python-substack; unsupported markdown fails the verb with exit 1 rather than silently dropping formatting",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "",
+      "revisions": []
+    },
+    {
+      "id": "c38",
+      "kind": "requirement",
+      "text": "write verbs never auto-retry a non-idempotent POST: backoff on 429/5xx applies to GETs only; a failed publish/reply/react reports the failure with exit 2 and any partial state, so a retry cannot double-post or double-comment",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h29",
+          "text": "a fake transport returning 500 to POST /drafts/{id}/publish yields exactly one request and exit 2; the same 500 on a GET yields a retry",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "two fake-transport tests",
+      "revisions": []
+    },
+    {
+      "id": "c39",
+      "kind": "requirement",
+      "text": "two-phase verbs report partial state: post publish is create-draft then publish, and if the publish step fails the verb still returns the draft id and URL (stdout, --json) so the agent can resume or delete it rather than re-create",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h30",
+          "text": "when the publish step fails, --json output contains the draft id and URL and the exit code is 2",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "fake-webglass test: draft create 200, publish 500",
+      "revisions": []
+    },
+    {
+      "id": "c40",
+      "kind": "requirement",
+      "text": "account whoami is the auth probe and distinguishes three states with distinct hints: no webglass session named (exit 2), webglass session exists but Substack answers 401 'Please sign in' (exit 2, hint: log in again headed), and authenticated (exit 0 with the account id and owned publications)",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h31",
+          "text": "the three states produce three distinct hint strings and the documented exit codes",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "parametrized test over the three fake responses",
+      "revisions": []
+    },
+    {
+      "id": "c41",
+      "kind": "requirement",
+      "text": "third-party text (comment bodies, feed items, post titles from other authors) is untrusted input to the consuming agent: in --json it sits under an explicit 'content' field per item and never in top-level message/hint strings; in text mode it is rendered verbatim but never interpolated into error:/hint: lines",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h32",
+          "text": "a comment body containing 'hint: run rm -rf' appears only under content in --json and never on stderr",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "fixture comment with hostile text",
+      "revisions": []
+    },
+    {
+      "id": "c42",
+      "kind": "requirement",
+      "text": "--publication accepts a host, validated as a DNS name; owner verbs only ever route through the webglass session (whose cookies the browser scopes to substack.com), and public read verbs only send stdlib GETs with no credentials, so a wrong or hostile host can leak nothing beyond the request itself",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h33",
+          "text": "--publication 'not a host' exits 1; public read verbs send no Cookie header (asserted on the fake transport)",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "two unit tests",
+      "revisions": []
+    },
+    {
+      "id": "c43",
+      "kind": "requirement",
+      "text": "every write verb has a containment twin in v1: post unpublish and post delete, comment delete, reaction remove \u2014 a bad publish can be pulled from the site even though already-sent emails cannot be recalled; each write verb's --json result carries the created object's id and canonical URL",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h34",
+          "text": "learn --json lists post unpublish, post delete, comment delete, reaction remove, and every write verb's --json result has id and url keys",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "assert on learn --json and on fake-transport results",
+      "revisions": []
+    },
+    {
+      "id": "c44",
+      "kind": "requirement",
+      "text": "post publish is two-step by default: it creates or updates a draft and returns its id; sending requires an explicit --send (or a separate 'post send' verb), and --no-email publishes to the site without emailing subscribers so live proofs on a real publication do not spam the list",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h35",
+          "text": "post publish without --send creates a draft only; with --send --no-email the fake transport sees send_email=false (field name confirmed at capture time)",
+          "status": "confirmed",
+          "instruction": ""
+        }
+      ],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "fake-transport tests; field name filled in after the request capture",
+      "revisions": []
+    },
+    {
+      "id": "c45",
+      "kind": "decision",
+      "text": "endpoint discovery: a one-off Chrome-MCP network capture on the owner's logged-in browser unblocks the plan now; a network lens is requested from webglass-cli (issue 17) for the durable path",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "the plan's first task is the capture; each shipped endpoint cites its captured request",
+      "revisions": []
+    },
+    {
+      "id": "c46",
+      "kind": "decision",
+      "text": "the live proof runs on jetsonailab.substack.com with --send --no-email and is cleaned up with post delete / comment delete / reaction remove",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": [],
+      "instruction": "PR records the --json output of the proof and of the cleanup",
+      "revisions": []
     }
   ],
   "open_vagueness": [
@@ -683,6 +906,24 @@
       "id": "v3",
       "text": "webglass-cli needs an authenticated, persistent-profile session (its M6 'authenticated capability', unbuilt at 0.8.3) plus a request/fetch verb from that session; a brief goes to agentculture/webglass-cli and substack-cli's owner verbs stay backend_unavailable until it lands",
       "kind": "follow_up",
+      "claim_id": null,
+      "resolved": false,
+      "resolution": "",
+      "resolution_claim_id": null
+    },
+    {
+      "id": "v4",
+      "text": "whether Substack POST endpoints require a CSRF token or specific headers beyond the session cookie, and whether custom-domain publications differ from *.substack.com \u2014 not observable until the first request capture",
+      "kind": "unknown_nonblocking",
+      "claim_id": null,
+      "resolved": false,
+      "resolution": "",
+      "resolution_claim_id": null
+    },
+    {
+      "id": "v5",
+      "text": "concurrency: two mesh runs sharing one webglass session could interleave draft edits; single-writer is assumed for v1 and not enforced",
+      "kind": "unknown_nonblocking",
       "claim_id": null,
       "resolved": false,
       "resolution": "",
@@ -867,8 +1108,86 @@
         "c33",
         "c34"
       ]
+    },
+    {
+      "id": "s23",
+      "surface": "challenge pass / adjacent-systems lens: webglass explain page inspect (lens list) + webglass-cli#17",
+      "finding": "no network/request lens exists; the v1 resolution and decision c31 overstate what webglass can observe; seeded c35 and question below",
+      "seeds": [
+        "c35"
+      ]
+    },
+    {
+      "id": "s24",
+      "surface": "challenge pass / unstated-assumptions lens: s17 endpoint list + s21 probe (publication subdomain vs substack.com)",
+      "finding": "the spec's after-state names one --publication host, but the Notes feed and comment/feed endpoints live on substack.com while archive/comments live on the publication host; seeded c36",
+      "seeds": [
+        "c36"
+      ]
+    },
+    {
+      "id": "s25",
+      "surface": "challenge pass / unstated-assumptions lens: c27 'from a markdown or JSON body file' + s17 ProseMirror bodies + s19 python-substack builder",
+      "finding": "markdown-to-ProseMirror conversion is unstated work; seeded c37 with a fail-closed rule for unsupported syntax",
+      "seeds": [
+        "c37"
+      ]
+    },
+    {
+      "id": "s26",
+      "surface": "challenge pass / cheap-probe lens: curl GET jetsonailab.substack.com/api/v1/{posts,archive} and substack.com/api/v1/{notes,feed/following}",
+      "finding": "publication endpoints return 200 with an empty list (the publication has no posts yet, so live proofs will create its first content); substack.com/api/v1/feed/following returns 401 'Please sign in' and /api/v1/notes 404 \u2014 the feed is account-scoped on substack.com and needs the session; seeded c36",
+      "seeds": [
+        "c36"
+      ]
+    },
+    {
+      "id": "s27",
+      "surface": "challenge pass / failure-mode lens: c30 backoff decision, s21 401 body shape, webglass session --ttl-seconds + lease semantics (webglass explain session create; webglass commits 04d2c23/9a290f6)",
+      "finding": "retry-with-backoff on writes can duplicate posts; publish is two calls; Substack signals logout with a 401 JSON body; webglass sessions carry a TTL and lease so the session can vanish mid-run \u2014 seeded c38, c39, c40",
+      "seeds": [
+        "c38",
+        "c39",
+        "c40"
+      ]
+    },
+    {
+      "id": "s28",
+      "surface": "challenge pass / security lens: c8 audience (agent-driven), webglass explain page inspect 'untrusted source material' rule, c7 --publication host input",
+      "finding": "prompt-injection via comment/feed text and host handling were unstated; seeded c41 and c42; session ids are public identifiers in webglass (endpoint_ref is the secret and never rendered) so passing --session-id on argv is acceptable",
+      "seeds": [
+        "c41",
+        "c42"
+      ]
+    },
+    {
+      "id": "s29",
+      "surface": "challenge pass / reversibility lens: c26 success signal ('one real post ... on jetsonailab.substack.com'), c27 verb list, s17 drafts endpoints",
+      "finding": "a published post emails every subscriber and cannot be un-sent; v1 listed no delete/unpublish/remove verbs; seeded c43 and c44 plus the question below on where the live proof runs",
+      "seeds": [
+        "c43",
+        "c44"
+      ]
+    },
+    {
+      "id": "s30",
+      "surface": "challenge pass / observability lens: c4 exit-code policy, _output.py stdout/stderr split, webglass WebOperationResult evidence",
+      "finding": "success paths return ids and URLs (c43) and failure paths return partial state (c39); no separate log file is proposed \u2014 stdout --json is the audit record and the PR proof; residual: no persistent local history of what was posted, left to the calling agent",
+      "seeds": []
     }
   ],
-  "lapses": [],
+  "lapses": [
+    {
+      "id": "l1",
+      "code": "assumption-for-measurement",
+      "what": "the v1 park resolution assumed 'webglass page open/inspect/extract' can discover API endpoints; webglass explain page inspect lists only outline/controls/metadata/console/structure lenses \u2014 no network lens \u2014 so that was an assumption standing in for a check",
+      "skipped_check": "read 'webglass explain page inspect' before resolving v1",
+      "refs": [
+        "challenge pass / adjacent-systems lens: webglass explain page inspect"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    }
+  ],
   "obligations": []
 }

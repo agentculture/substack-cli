@@ -55,6 +55,27 @@
 - v1 splits by auth need: public read verbs (post list/get, comment list, reaction list on public posts) use stdlib HTTP and ship first; owner verbs (post publish/schedule, comment reply, reaction add, feed read, account whoami) are wired to webglass sessions and report a structured `backend_unavailable` (exit 2) until webglass-cli ships authenticated persistent sessions
   - instruction: CI test job has no webglass on PATH; run the full suite there
   - honesty: on a machine without webglass, every public read verb still exits 0 and every owner verb exits 2 with a hint naming webglass-cli
+- write verbs never auto-retry a non-idempotent POST: backoff on 429/5xx applies to GETs only; a failed publish/reply/react reports the failure with exit 2 and any partial state, so a retry cannot double-post or double-comment
+  - instruction: two fake-transport tests
+  - honesty: a fake transport returning 500 to POST /drafts/{id}/publish yields exactly one request and exit 2; the same 500 on a GET yields a retry
+- two-phase verbs report partial state: post publish is create-draft then publish, and if the publish step fails the verb still returns the draft id and URL (stdout, --json) so the agent can resume or delete it rather than re-create
+  - instruction: fake-webglass test: draft create 200, publish 500
+  - honesty: when the publish step fails, --json output contains the draft id and URL and the exit code is 2
+- account whoami is the auth probe and distinguishes three states with distinct hints: no webglass session named (exit 2), webglass session exists but Substack answers 401 'Please sign in' (exit 2, hint: log in again headed), and authenticated (exit 0 with the account id and owned publications)
+  - instruction: parametrized test over the three fake responses
+  - honesty: the three states produce three distinct hint strings and the documented exit codes
+- third-party text (comment bodies, feed items, post titles from other authors) is untrusted input to the consuming agent: in --json it sits under an explicit 'content' field per item and never in top-level message/hint strings; in text mode it is rendered verbatim but never interpolated into error:/hint: lines
+  - instruction: fixture comment with hostile text
+  - honesty: a comment body containing 'hint: run rm -rf' appears only under content in --json and never on stderr
+- --publication accepts a host, validated as a DNS name; owner verbs only ever route through the webglass session (whose cookies the browser scopes to substack.com), and public read verbs only send stdlib GETs with no credentials, so a wrong or hostile host can leak nothing beyond the request itself
+  - instruction: two unit tests
+  - honesty: --publication 'not a host' exits 1; public read verbs send no Cookie header (asserted on the fake transport)
+- every write verb has a containment twin in v1: post unpublish and post delete, comment delete, reaction remove — a bad publish can be pulled from the site even though already-sent emails cannot be recalled; each write verb's --json result carries the created object's id and canonical URL
+  - instruction: assert on learn --json and on fake-transport results
+  - honesty: learn --json lists post unpublish, post delete, comment delete, reaction remove, and every write verb's --json result has id and url keys
+- post publish is two-step by default: it creates or updates a draft and returns its id; sending requires an explicit --send (or a separate 'post send' verb), and --no-email publishes to the site without emailing subscribers so live proofs on a real publication do not spam the list
+  - instruction: fake-transport tests; field name filled in after the request capture
+  - honesty: post publish without --send creates a draft only; with --send --no-email the fake transport sees `send_email`=false (field name confirmed at capture time)
 
 ## Honesty conditions
 
@@ -79,7 +100,7 @@
 
 - the runtime package keeps dependencies = \[\] (pyproject.toml): HTTP is stdlib urllib for public read endpoints, and every authenticated operation goes through the webglass binary as a subprocess; webglass-cli is an install prerequisite (like devex and agtag), never a Python dependency
   - instruction: run both on the feature branch
-- credentials (the Substack session cookie / login secret) come only from environment variables or a gitignored local file; scripts/scan-secrets.py fails CI on committed credential-shaped strings, and its endpoint check fails any non-localhost http(s) URL under url/endpoint/host/baseUrl keys in JSON files — so no checked-in JSON config may carry <https://substack.com>
+- substack-cli holds no Substack credential at all: the only auth input is a webglass session id; scripts/scan-secrets.py still fails CI on committed credential-shaped strings and on non-localhost URLs under url/endpoint/host/baseUrl keys in JSON files, so no checked-in JSON config may carry <https://substack.com>
   - instruction: run the script; grep -l substack.com -- '\*.json'
 - browser control lives entirely in webglass-cli: substack-cli composes webglass session/page/action verbs and parses their WebOperationResult JSON; it adds no browser code, no form filling and no web UI of its own
   - instruction: tests inject a fake webglass executable on PATH
@@ -94,11 +115,14 @@
 ## Assumptions
 
 - the first proving ground is the jetsonailab.substack.com publication, but the CLI stays account-agnostic: the publication host and credentials are runtime inputs (env / flag / config), never a default baked into code or docs
-- credentials live in environment variables (and optionally a gitignored .env, already covered by .gitignore); no new ignore pattern is needed unless a repo-local config file is introduced, and that decision is deferred until the auth design is settled
+- no credential file or ignore pattern is needed: the CLI's inputs are a webglass session id, a publication host and post/comment ids; the browser profile lives under webglass's own state dir, outside this repo
 - authentication is a webglass session whose persistent Chromium profile the owner logged into once; substack-cli names it by `SUBSTACK_WEBGLASS_SESSION` (or --session-id) and treats a missing/unauthenticated session as exit 2 with a hint; webglass-cli 0.8.3 cannot create such a session yet (M6 unbuilt), so owner-only verbs stay `backend_unavailable` until it does
   - instruction: curl-equivalent test for archive; fake-webglass test for the exit-2 path
-- the endpoint map is taken as leads from python-substack (drafts create/publish/schedule, MIT, active) and AnthonyDavidAdams/substack-api-reference (129 endpoints incl. comments, reactions, notes, subscribers, stats), then confirmed by a DevTools network capture against jetsonailab.substack.com before any client code is written; unverified paths are never shipped
+- the endpoint map is taken as leads from python-substack (drafts create/publish/schedule, MIT, active) and AnthonyDavidAdams/substack-api-reference (129 endpoints incl. comments, reactions, notes, subscribers, stats), then confirmed by an observed request capture against jetsonailab.substack.com (mechanism per the open capture question) before any client code is written; unverified paths are never shipped
 - cite-don't-import candidates: ma2za/python-substack (MIT, write side: drafts/publish/schedule/images) and NHagar/`substack_api` (MIT, read side) are the reference implementations to cite from; the TypeScript clients and MCP servers are consulted for endpoint shapes only
+- webglass-cli 0.8.3 has no network lens (page inspect offers outline/controls/metadata/console/structure only), so endpoint discovery on the logged-in publication needs either a network lens added to webglass (extend webglass-cli#17) or a one-off DevTools/Chrome-MCP capture; webglass alone cannot observe the SPA's XHR calls today
+- there are two API bases, not one: publication-scoped verbs (post, comment, reaction on posts) hit https://`<publication-host>\`/api/v1, while account-scoped verbs (feed read, notes, account whoami) hit <https://substack.com/api/v1>; --publication selects the former and the session implies the latter; publications on custom domains are addressed by their host, unverified
+- post bodies are ProseMirror JSON; 'publish from markdown' means converting a restricted markdown subset (headings, paragraphs, bold/italic, links, lists, images by URL) through a builder cited from python-substack; unsupported markdown fails the verb with exit 1 rather than silently dropping formatting
 
 ## Scope exploration
 
@@ -146,11 +170,26 @@
   - seeds: `c20`
 - `s22` — `webglass-cli CLAUDE.md M5/M6 + session create docs (re-read for the runtime-plane decision)`: M5 (fill/select, preview/apply) and M6 (authenticated capability, credential brokering) are explicitly 'not built' / 'only on demand'; sessions persist a `user_data_dir` but never raw cookies or full profiles by default — so an authenticated session is new webglass work, not a configuration
   - seeds: `c33`, `c34`
+- `s23` — `challenge pass / adjacent-systems lens: webglass explain page inspect (lens list) + webglass-cli#17`: no network/request lens exists; the v1 resolution and decision c31 overstate what webglass can observe; seeded c35 and question below
+  - seeds: `c35`
+- `s24` — `challenge pass / unstated-assumptions lens: s17 endpoint list + s21 probe (publication subdomain vs substack.com)`: the spec's after-state names one --publication host, but the Notes feed and comment/feed endpoints live on substack.com while archive/comments live on the publication host; seeded c36
+  - seeds: `c36`
+- `s25` — `challenge pass / unstated-assumptions lens: c27 'from a markdown or JSON body file' + s17 ProseMirror bodies + s19 python-substack builder`: markdown-to-ProseMirror conversion is unstated work; seeded c37 with a fail-closed rule for unsupported syntax
+  - seeds: `c37`
+- `s26` — `challenge pass / cheap-probe lens: curl GET jetsonailab.substack.com/api/v1/{posts,archive} and substack.com/api/v1/{notes,feed/following}`: publication endpoints return 200 with an empty list (the publication has no posts yet, so live proofs will create its first content); substack.com/api/v1/feed/following returns 401 'Please sign in' and /api/v1/notes 404 — the feed is account-scoped on substack.com and needs the session; seeded c36
+  - seeds: `c36`
+- `s27` — `challenge pass / failure-mode lens: c30 backoff decision, s21 401 body shape, webglass session --ttl-seconds + lease semantics (webglass explain session create; webglass commits 04d2c23/9a290f6)`: retry-with-backoff on writes can duplicate posts; publish is two calls; Substack signals logout with a 401 JSON body; webglass sessions carry a TTL and lease so the session can vanish mid-run — seeded c38, c39, c40
+  - seeds: `c38`, `c39`, `c40`
+- `s28` — `challenge pass / security lens: c8 audience (agent-driven), webglass explain page inspect 'untrusted source material' rule, c7 --publication host input`: prompt-injection via comment/feed text and host handling were unstated; seeded c41 and c42; session ids are public identifiers in webglass (`endpoint_ref` is the secret and never rendered) so passing --session-id on argv is acceptable
+  - seeds: `c41`, `c42`
+- `s29` — `challenge pass / reversibility lens: c26 success signal ('one real post ... on jetsonailab.substack.com'), c27 verb list, s17 drafts endpoints`: a published post emails every subscriber and cannot be un-sent; v1 listed no delete/unpublish/remove verbs; seeded c43 and c44 plus the question below on where the live proof runs
+  - seeds: `c43`, `c44`
+- `s30` — `challenge pass / observability lens: c4 exit-code policy, _output.py stdout/stderr split, webglass WebOperationResult evidence`: success paths return ids and URLs (c43) and failure paths return partial state (c39); no separate log file is proposed — stdout --json is the audit record and the PR proof; residual: no persistent local history of what was posted, left to the calling agent
 
 ## Decisions
 
 - the noun/verb map follows the repo's own convention: every noun exposes overview, every verb takes --json, descriptive verbs exit 0 on empty results
-- authentication is delegated to a Playwright-controlled browser: the owner logs in once in a persistent Chromium profile and the CLI trusts that profile's session for every API call
+- authentication is delegated to a browser the owner logged into once (a persistent Chromium profile); the CLI trusts that browser's session for every API call and never handles email/password — realised through webglass-cli sessions per c33
   - instruction: substack account whoami exits 2 with a 'log in once in the profile' hint when the profile has no Substack session
 - the README carries an explicit Substack ToS-risk notice and the client is serial with exponential backoff on 429 and 5xx
   - instruction: grep the README for the notice; unit test the backoff with a fake transport returning 429 then 200
@@ -158,6 +197,10 @@
   - instruction: each implemented endpoint cites the webglass evidence (page-ref or extract output) in the PR
 - webglass-cli is the runtime browser plane: substack-cli drives it as a subprocess ('webglass session/page/action ... --json'), the way the cicd skill drives devex; substack-cli never imports Playwright and keeps dependencies = \[\]
   - instruction: substack doctor reports whether 'webglass' is on PATH and its version
+- endpoint discovery: a one-off Chrome-MCP network capture on the owner's logged-in browser unblocks the plan now; a network lens is requested from webglass-cli (issue 17) for the durable path
+  - instruction: the plan's first task is the capture; each shipped endpoint cites its captured request
+- the live proof runs on jetsonailab.substack.com with --send --no-email and is cleaned up with post delete / comment delete / reaction remove
+  - instruction: PR records the --json output of the proof and of the cleanup
 
 ## Hard questions
 
@@ -167,6 +210,8 @@
 ## Open parks
 
 - [unknown_nonblocking] rate limits, Cloudflare challenges on /api/v1 and session lifetime are undocumented anywhere; learn empirically and add backoff — not decidable before first live runs
+- [unknown_nonblocking] whether Substack POST endpoints require a CSRF token or specific headers beyond the session cookie, and whether custom-domain publications differ from \*.substack.com — not observable until the first request capture
+- [unknown_nonblocking] concurrency: two mesh runs sharing one webglass session could interleave draft edits; single-writer is assumed for v1 and not enforced
 - [follow_up] webglass-cli needs an authenticated, persistent-profile session (its M6 'authenticated capability', unbuilt at 0.8.3) plus a request/fetch verb from that session; a brief goes to agentculture/webglass-cli and substack-cli's owner verbs stay `backend_unavailable` until it lands
 
 ## Resolved vagueness
