@@ -209,9 +209,10 @@ yours from junk. Use a branch prefix scoped to the work (`posts/t2`, not
 `agent/t2`): plain `agent/*` names collide with leftovers from earlier fan-outs
 and `git worktree add -b` fails on an existing branch.
 
-The vendored `assign-to-workforce` skill's fan-out example uses both the shared
-`../worktrees/` path and `agent/<task-id>` branches — override *both* when you
-follow it; the skill is cited verbatim and must not be edited.
+The vendored `assign-to-workforce` skill already mandates the same repo-named
+worktree root (`.worktrees.<repo-name>`, `SKILL.md` §Fan-out) — that half needs
+no override. Its example *branch* names are `agent/<task-id>`, so scope those to
+the work when you follow it; the skill is cited verbatim and must not be edited.
 
 **Exception — tool-managed throwaways.** `ask-colleague`'s read-only verbs
 create their own detached worktree under `${TMPDIR:-/tmp}` and delete it on an
