@@ -1,8 +1,8 @@
 """Subprocess adapter onto the sibling `webglass` CLI (webglass-cli).
 
-substack-cli never talks to a browser directly (no `playwright` import
-anywhere under `substack_cli`, and `pyproject.toml`'s `dependencies` stays
-`[]`): every guarded web operation is delegated to the `webglass` binary,
+substack-cli never talks to a browser directly (no headless-browser-automation
+import anywhere under `substack_cli`, and `pyproject.toml`'s `dependencies`
+stays `[]`): every guarded web operation is delegated to the `webglass` binary,
 invoked as a subprocess with `--json`, whose stdout is a single
 `WebOperationResult` JSON document — the same shape whether the operation
 succeeded, was denied/blocked, or failed outright.
