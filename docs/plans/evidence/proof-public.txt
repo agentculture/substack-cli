@@ -1,0 +1,86 @@
+# substack-cli public-half live proof (t17). Captured 2026-09-13T05:10:00Z. JSON record follows.
+{
+  "captured": "2026-09-13T05:08:23+00:00",
+  "session": "none (public read verbs, no SUBSTACK_WEBGLASS_SESSION)",
+  "runs": [
+    {
+      "argv": [
+        "substack",
+        "post",
+        "list",
+        "--publication",
+        "jetsonailab.substack.com",
+        "--limit",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": [],
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "substack",
+        "reaction",
+        "list",
+        "--publication",
+        "jetsonailab.substack.com",
+        "--post",
+        "substack-cli-capture-test",
+        "--json"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "{\"code\": 1, \"message\": \"no such post 'substack-cli-capture-test' on 'jetsonailab.substack.com'\", \"remediation\": \"check the slug and --publication host\"}"
+    },
+    {
+      "argv": [
+        "substack",
+        "post",
+        "list",
+        "--publication",
+        "on.substack.com",
+        "--limit",
+        "2",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": [
+        {
+          "id": 214913852,
+          "date": "2026-09-10T17:58:26.844Z",
+          "url": "https://on.substack.com/p/shea-serrano-podcast",
+          "content": "Shea Serrano did the math on podcasting. Betting on himself was the winning equation. \n\nShea Serrano and Jason Concepcion are back: inside the numbers and lessons from their first week podcasting on Substack",
+          "slug": "shea-serrano-podcast",
+          "reaction_count": 1235,
+          "comment_count": 0
+        },
+        {
+          "id": 212722695,
+          "date": "2026-08-25T17:17:56.219Z",
+          "url": "https://on.substack.com/p/new-on-substack-creator-match-audience",
+          "content": "New on Substack: Creator match, audience-specific content blocks, global reply rules, advanced podcast transcript editing, and more\n\nReach new subscribers, deepen relationships with the ones you have, and build a more sustainable business around your work",
+          "slug": "new-on-substack-creator-match-audience",
+          "reaction_count": 1958,
+          "comment_count": 0
+        }
+      ],
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "substack",
+        "comment",
+        "list",
+        "--publication",
+        "on.substack.com",
+        "--post",
+        "1",
+        "--json"
+      ],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "{\"code\": 2, \"message\": \"GET https://on.substack.com/api/v1/post/1/comments failed after 1 attempts: HTTP Error 404: Not Found\", \"remediation\": \"check network connectivity and SUBSTACK_API_BASE\"}"
+    }
+  ]
+}

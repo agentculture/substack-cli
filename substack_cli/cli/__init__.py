@@ -62,16 +62,24 @@ def _argv_has_json(argv: list[str] | None) -> bool:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    from substack_cli.cli._commands import account as _account_group
     from substack_cli.cli._commands import cli as _cli_group
+    from substack_cli.cli._commands import comment as _comment_group
     from substack_cli.cli._commands import doctor as _doctor_cmd
     from substack_cli.cli._commands import explain as _explain_cmd
+    from substack_cli.cli._commands import feed as _feed_group
     from substack_cli.cli._commands import learn as _learn_cmd
     from substack_cli.cli._commands import overview as _overview_cmd
+    from substack_cli.cli._commands import post as _post_group
+    from substack_cli.cli._commands import reaction as _reaction_group
     from substack_cli.cli._commands import whoami as _whoami_cmd
 
     parser = _CliArgumentParser(
         prog="substack-cli",
-        description="substack-cli — a clonable template for AgentCulture mesh agents.",
+        description=(
+            "substack-cli — an agent-first CLI to manage a Substack publication "
+            "and account (unofficial, not affiliated with Substack)."
+        ),
     )
     parser.add_argument(
         "--version",
@@ -91,6 +99,11 @@ def _build_parser() -> argparse.ArgumentParser:
     # Register your own noun groups here:
     #   from substack_cli.cli._commands import my_noun as _my_noun_group
     #   _my_noun_group.register(sub)
+    _account_group.register(sub)
+    _post_group.register(sub)
+    _comment_group.register(sub)
+    _reaction_group.register(sub)
+    _feed_group.register(sub)
 
     return parser
 

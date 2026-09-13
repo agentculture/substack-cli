@@ -10,17 +10,18 @@ Qwen Code session.
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** *(planned — see Status below)* — publish and schedule posts, read
-posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
+account** — publish and schedule posts, read posts and comments, react to
+posts/comments, and read the account feed. Unofficial community tool, not
 affiliated with Substack.
 
-**Status: scaffold.** None of that domain surface exists on disk yet. What is
-checked in today is the AgentCulture sibling baseline this repo was scaffolded
-from (`culture-agent-template`): the agent-first CLI skeleton (`whoami`,
-`learn`, `explain`, `overview`, `doctor`, `cli overview`), a mesh identity, the
-vendored guildmaster skill kit, and a buildable/deployable package baseline.
-The Substack nouns and verbs are the work ahead. Do not describe them as
-existing, and do not assume a hidden module implements them — read the tree.
+Five nouns are wired: `account`, `post`, `comment`, `reaction`, `feed` (see
+[Substack surface](#substack-surface) below). The AgentCulture sibling
+baseline this repo was scaffolded from (`culture-agent-template`) is still
+underneath: the agent-first CLI skeleton (`whoami`, `learn`, `explain`,
+`overview`, `doctor`, `cli overview`), a mesh identity, the vendored
+guildmaster skill kit, and a buildable/deployable package baseline. Do not
+assume a verb beyond those five exists (e.g. subscriber management or
+audience statistics) — read the tree.
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the **skills supplier**), [`steward`](https://github.com/agentculture/steward)
@@ -105,7 +106,8 @@ that way when you add domain verbs — a Substack HTTP client belongs behind an
 optional extra or in the stdlib, not in `dependencies`.
 
 Verbs today: `whoami`, `learn`, `explain <path>`, `overview`, `doctor`,
-`cli overview`.
+`cli overview`, plus the five Substack nouns — see
+[Substack surface](#substack-surface) below.
 
 The wiring that spans files:
 
@@ -140,13 +142,30 @@ verbs never hard-fail on a bad target (`overview /no/such/path` exits `0`);
 `learn` must keep covering purpose, command map, exit codes, `--json`, and
 `explain`.
 
-## Adding the Substack surface (planned)
+## Substack surface
+
+The domain layer lives in `substack_cli/substack/`: `http.py` (stdlib HTTP for
+the public read verbs — `post list`/`get`, `comment list`, `reaction list`, no
+session needed), `webglass.py` (subprocess wrapper around the sibling
+`webglass-cli` project's `webglass` binary for owner verbs — `post
+publish`/`schedule`/`unpublish`/`delete`, `comment reply`/`delete`, `reaction
+add`/`remove`, `feed read`, `account whoami`), and `render.py`/`body.py`
+(ProseMirror body construction). Owner verbs need
+`$SUBSTACK_WEBGLASS_SESSION` naming a session already logged in to Substack;
+until `webglass-cli` can create such a session itself
+(`agentculture/webglass-cli#17`), owner verbs exit `2` with a hint. `post
+publish` is draft-first — without `--send` it only creates a draft; `--send`
+alone emails every subscriber and cannot be recalled. Tests for this layer
+use fakes under `tests/fakes/`.
 
 A new noun is a module under `cli/_commands/` with `register(sub)`, a line in
 `_build_parser()`, a catalog entry in `explain/catalog.py`, a row in `learn.py`'s
-text **and** JSON payload, and tests. Credentials (Substack session cookies or
-API tokens) come from the environment — `scripts/scan-secrets.py` runs in CI
-and fails on committed credentials and non-localhost endpoints.
+text **and** JSON payload, and tests. Every endpoint the CLI calls must appear
+in [`docs/api/substack-endpoints.md`](docs/api/substack-endpoints.md) before
+it ships — that file is the only record of what Substack's unpublished API
+actually does. Credentials (Substack session cookies or API tokens) come from
+the environment — `scripts/scan-secrets.py` runs in CI and fails on committed
+credentials and non-localhost endpoints.
 
 ## Skills
 
@@ -180,11 +199,14 @@ one without it.
 ```text
 substack_cli/             agent-first CLI (cited from teken's python-cli reference)
   cli/                    parser, error/output contract, _commands/ (verbs)
+  substack/               domain layer: http.py, webglass.py, render.py, body.py
   explain/                markdown catalog for `explain`
 tests/                    CLI smoke, introspection, harness-registry, script tests
+tests/fakes/              fakes for the Substack domain layer
 scripts/                  scan-secrets.py, harness-smoke.py (both CI gates)
 .claude/skills/           vendored guildmaster skill kit (cite-don't-import)
-docs/                     skill provenance + the four-harness contract/verification
+docs/                     skill provenance, four-harness contract/verification,
+                          docs/api/substack-endpoints.md (observed endpoint map)
 culture.yaml              mesh identity (suffix + backend)
 .github/workflows/        tests.yml (test/lint/harness-smoke/version-check), publish.yml
 ```

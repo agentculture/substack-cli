@@ -1,6 +1,6 @@
 [project]
 name = "substack-cli"
-version = "0.9.1"
+version = "0.10.0"
 description = "Agent-first CLI to manage a Substack publication and account: publish and schedule posts, read posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not affiliated with Substack."
 readme = "README.md"
 license = "Apache-2.0"
