@@ -36,6 +36,7 @@ import argparse
 import re
 from typing import Any
 
+from substack_cli.cli._commands._help import JSON_HELP, PUBLICATION_HELP
 from substack_cli.cli._commands.overview import emit_overview
 from substack_cli.cli._errors import CliError
 from substack_cli.cli._output import emit_result
@@ -195,7 +196,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="React to a publication's posts and comments (see "
         "'substack-cli reaction overview').",
     )
-    p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    p.add_argument("--json", action="store_true", help=JSON_HELP)
     p.set_defaults(func=cmd_reaction_overview, json=False)
     # `p` is a _CliArgumentParser (top-level subparsers were built with that
     # parser_class); propagate it so `reaction <verb>` parse errors route
@@ -206,19 +207,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     list_p = noun_sub.add_parser(
         "list", help="List a post's aggregate reaction counts (public, no session)."
     )
-    list_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    list_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     list_p.add_argument("--post", required=True, help="Post slug, e.g. my-first-post")
-    list_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    list_p.add_argument("--json", action="store_true", help=JSON_HELP)
     list_p.set_defaults(func=cmd_reaction_list)
 
     add_p = noun_sub.add_parser(
         "add", help="Add a reaction to a post or comment (requires a webglass session)."
     )
-    add_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    add_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     add_group = add_p.add_mutually_exclusive_group(required=True)
     add_group.add_argument("--post", help="Post id to react to.")
     add_group.add_argument("--comment", help="Comment id to react to.")
@@ -228,22 +225,20 @@ def register(sub: argparse._SubParsersAction) -> None:
         help=f"Reaction emoji (default {_DEFAULT_EMOJI!r} -- the only value Substack "
         "has been observed to accept).",
     )
-    add_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    add_p.add_argument("--json", action="store_true", help=JSON_HELP)
     add_p.set_defaults(func=cmd_reaction_add)
 
     remove_p = noun_sub.add_parser(
         "remove",
         help="Remove your reaction from a post or comment (requires a webglass session).",
     )
-    remove_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    remove_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     remove_group = remove_p.add_mutually_exclusive_group(required=True)
     remove_group.add_argument("--post", help="Post id to remove your reaction from.")
     remove_group.add_argument("--comment", help="Comment id to remove your reaction from.")
-    remove_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    remove_p.add_argument("--json", action="store_true", help=JSON_HELP)
     remove_p.set_defaults(func=cmd_reaction_remove)
 
     ov = noun_sub.add_parser("overview", help="Describe the reaction noun's verb surface.")
-    ov.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    ov.add_argument("--json", action="store_true", help=JSON_HELP)
     ov.set_defaults(func=cmd_reaction_overview)

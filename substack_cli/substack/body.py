@@ -121,7 +121,7 @@ def _guard_block_start(line: str, line_no: int) -> None:
         raise _unsupported("indented code block", line_no)
     if indent and (_BULLET_RE.match(stripped) or _ORDERED_RE.match(stripped)):
         raise _unsupported("nested list", line_no)
-    if stripped.startswith("```") or stripped.startswith("~~~"):
+    if stripped.startswith(("```", "~~~")):
         raise _unsupported("fenced code block", line_no)
     if stripped.startswith(">"):
         raise _unsupported("block quote", line_no)

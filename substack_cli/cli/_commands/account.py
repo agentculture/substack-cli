@@ -48,6 +48,7 @@ import shutil
 import subprocess  # nosec B404 - subprocess is the whole point of this probe
 from typing import Any
 
+from substack_cli.cli._commands._help import JSON_HELP
 from substack_cli.cli._errors import EXIT_ENV_ERROR, CliError
 from substack_cli.cli._output import emit_result
 from substack_cli.substack import http, webglass
@@ -187,7 +188,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Account identity probe over the webglass session "
         "(see 'substack-cli account overview').",
     )
-    p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    p.add_argument("--json", action="store_true", help=JSON_HELP)
     p.set_defaults(func=_no_verb, json=False)
     # `p` is a _CliArgumentParser (the top-level subparsers were built with that
     # parser_class); propagate it so `account whoami`/`account overview` parse
@@ -201,7 +202,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "the authenticated account (three-state: no session, dead session, "
         "authenticated).",
     )
-    who.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    who.add_argument("--json", action="store_true", help=JSON_HELP)
     who.add_argument(
         "--publication",
         required=True,
@@ -215,5 +216,5 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Report whether webglass is available for account operations "
         "(presence + version); never fails on a missing webglass install.",
     )
-    ov.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    ov.add_argument("--json", action="store_true", help=JSON_HELP)
     ov.set_defaults(func=cmd_account_overview)

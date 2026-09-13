@@ -61,7 +61,6 @@ def _reset_env(monkeypatch: pytest.MonkeyPatch):
     _prepend_fake_webglass_to_path(monkeypatch)
     monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
     monkeypatch.delenv("SUBSTACK_API_BASE", raising=False)
-    yield
 
 
 def _make_parser() -> argparse.ArgumentParser:

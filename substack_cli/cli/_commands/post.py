@@ -26,6 +26,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+from substack_cli.cli._commands._help import JSON_HELP, PUBLICATION_HELP
 from substack_cli.cli._commands.overview import emit_overview
 from substack_cli.cli._errors import CliError
 from substack_cli.cli._output import emit_diagnostic, emit_error, emit_result
@@ -88,7 +89,12 @@ def cmd_post_list(args: argparse.Namespace) -> int:
     json_mode = bool(getattr(args, "json", False))
     path = f"archive?sort=new&offset={args.offset}&limit={args.limit}"
     raw = http.get_json(args.publication, path)
-    posts = raw if isinstance(raw, list) else raw.get("posts", []) if isinstance(raw, dict) else []
+    if isinstance(raw, list):
+        posts = raw
+    elif isinstance(raw, dict):
+        posts = raw.get("posts", [])
+    else:
+        posts = []
     render_items([_to_render_item(item) for item in posts], json_mode=json_mode)
     return 0
 
@@ -401,7 +407,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "post",
         help="Read (and, later, manage) a publication's posts (see 'substack-cli post overview').",
     )
-    p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    p.add_argument("--json", action="store_true", help=JSON_HELP)
     p.set_defaults(func=cmd_post_overview, json=False)
     # `p` is a _CliArgumentParser (top-level subparsers were built with that
     # parser_class); propagate it so `post <verb>` parse errors route through
@@ -409,32 +415,26 @@ def register(sub: argparse._SubParsersAction) -> None:
     noun_sub = p.add_subparsers(dest="post_command", parser_class=type(p))
 
     list_p = noun_sub.add_parser("list", help="List a publication's archive (newest first).")
-    list_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    list_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     list_p.add_argument("--limit", type=int, default=_DEFAULT_LIMIT)
     list_p.add_argument("--offset", type=int, default=_DEFAULT_OFFSET)
-    list_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    list_p.add_argument("--json", action="store_true", help=JSON_HELP)
     list_p.set_defaults(func=cmd_post_list)
 
     get_p = noun_sub.add_parser("get", help="Fetch one post by slug.")
     get_p.add_argument("slug", help="Post slug, e.g. my-first-post")
-    get_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
-    get_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    get_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
+    get_p.add_argument("--json", action="store_true", help=JSON_HELP)
     get_p.set_defaults(func=cmd_post_get)
 
     ov = noun_sub.add_parser("overview", help="Describe the post noun's verb surface.")
-    ov.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    ov.add_argument("--json", action="store_true", help=JSON_HELP)
     ov.set_defaults(func=cmd_post_overview)
 
     # --- write verbs (t10) register below this line ---
 
     pub_p = noun_sub.add_parser("publish", help="Create a draft and optionally publish it.")
-    pub_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    pub_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     body_src = pub_p.add_mutually_exclusive_group(required=True)
     body_src.add_argument("--markdown", help="Path to a markdown file (restricted subset).")
     body_src.add_argument("--body-json", dest="body_json", help="Path to a ProseMirror JSON file.")
@@ -454,32 +454,26 @@ def register(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help="With --send, publish on the web only (no email to subscribers).",
     )
-    pub_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    pub_p.add_argument("--json", action="store_true", help=JSON_HELP)
     pub_p.set_defaults(func=cmd_post_publish)
 
     sched_p = noun_sub.add_parser("schedule", help="Schedule an existing draft for publication.")
-    sched_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    sched_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     sched_p.add_argument("--draft", required=True, help="Draft id to schedule.")
     sched_p.add_argument(
         "--at", required=True, help="ISO 8601 timestamp, e.g. 2026-10-01T09:00:00Z"
     )
-    sched_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    sched_p.add_argument("--json", action="store_true", help=JSON_HELP)
     sched_p.set_defaults(func=cmd_post_schedule)
 
     unpub_p = noun_sub.add_parser("unpublish", help="Return a published post to drafts.")
     unpub_p.add_argument("post_id", help="Post/draft id.")
-    unpub_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
-    unpub_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    unpub_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
+    unpub_p.add_argument("--json", action="store_true", help=JSON_HELP)
     unpub_p.set_defaults(func=cmd_post_unpublish)
 
     del_p = noun_sub.add_parser("delete", help="Delete a draft or unpublished post.")
     del_p.add_argument("post_id", help="Post/draft id.")
-    del_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
-    del_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    del_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
+    del_p.add_argument("--json", action="store_true", help=JSON_HELP)
     del_p.set_defaults(func=cmd_post_delete)

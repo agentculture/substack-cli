@@ -33,6 +33,7 @@ import json
 from typing import Any
 from urllib.parse import urlencode
 
+from substack_cli.cli._commands._help import JSON_HELP, PUBLICATION_HELP
 from substack_cli.cli._commands.overview import emit_overview
 from substack_cli.cli._output import emit_result
 from substack_cli.substack import http, webglass
@@ -225,7 +226,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Read a post's comments, and reply/delete as owner (see"
         " 'substack-cli comment overview').",
     )
-    p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    p.add_argument("--json", action="store_true", help=JSON_HELP)
     p.set_defaults(func=cmd_comment_overview, json=False)
     # `p` is a _CliArgumentParser (top-level subparsers were built with that
     # parser_class); propagate it so `comment <verb>` parse errors route
@@ -234,11 +235,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     noun_sub = p.add_subparsers(dest="comment_command", parser_class=type(p))
 
     list_p = noun_sub.add_parser("list", help="List a post's comments (public).")
-    list_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    list_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     list_p.add_argument("--post", required=True, help="Post id, e.g. 42")
-    list_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    list_p.add_argument("--json", action="store_true", help=JSON_HELP)
     list_p.set_defaults(func=cmd_comment_list)
 
     reply_p = noun_sub.add_parser(
@@ -246,30 +245,26 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Post a top-level comment, or a threaded reply with --parent (owner, via"
         " webglass).",
     )
-    reply_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    reply_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     reply_p.add_argument("--post", required=True, help="Post id to comment on, e.g. 42")
     reply_p.add_argument("--body", required=True, help="Comment text.")
     reply_p.add_argument(
         "--parent", default=None, help="Parent comment id, to post a threaded reply."
     )
-    reply_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    reply_p.add_argument("--json", action="store_true", help=JSON_HELP)
     reply_p.set_defaults(func=cmd_comment_reply)
 
     delete_p = noun_sub.add_parser("delete", help="Delete a comment (owner, via webglass).")
     delete_p.add_argument("comment_id", type=int, help="Comment id to delete, e.g. 99")
-    delete_p.add_argument(
-        "--publication", required=True, help="Publication host, e.g. example.substack.com"
-    )
+    delete_p.add_argument("--publication", required=True, help=PUBLICATION_HELP)
     delete_p.add_argument(
         "--post",
         default=None,
         help="Post id the comment belongs to (only used to build a nicer --json 'url').",
     )
-    delete_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    delete_p.add_argument("--json", action="store_true", help=JSON_HELP)
     delete_p.set_defaults(func=cmd_comment_delete)
 
     ov = noun_sub.add_parser("overview", help="Describe the comment noun's verb surface.")
-    ov.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    ov.add_argument("--json", action="store_true", help=JSON_HELP)
     ov.set_defaults(func=cmd_comment_overview)

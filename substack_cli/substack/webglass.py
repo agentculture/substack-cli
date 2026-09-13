@@ -239,7 +239,7 @@ def run_webglass(args: list[str]) -> dict[str, Any]:
         raise CliError(
             EXIT_ENV_ERROR,
             "webglass printed JSON that was not a WebOperationResult object",
-            "run the same 'webglass ... --json' command manually to inspect " "its output",
+            "run the same 'webglass ... --json' command manually to inspect its output",
         )
 
     if _result_reports_unknown_verb(result):

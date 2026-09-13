@@ -110,7 +110,8 @@ def test_link_mark_carries_href() -> None:
 def test_bold_and_italic_in_one_paragraph() -> None:
     nodes = _blocks("**b** and *i*")[0]["content"]
     marks = [n.get("marks", [{}])[0].get("type") for n in nodes]
-    assert "strong" in marks and "em" in marks
+    assert "strong" in marks
+    assert "em" in marks
 
 
 # --- lists ------------------------------------------------------------------

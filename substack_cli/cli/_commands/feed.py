@@ -36,6 +36,7 @@ import json
 from typing import Any
 from urllib.parse import urlencode
 
+from substack_cli.cli._commands._help import JSON_HELP
 from substack_cli.cli._commands.overview import emit_overview
 from substack_cli.cli._errors import CliError
 from substack_cli.cli._output import emit_result
@@ -177,7 +178,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "feed",
         help="Read the account's Notes/reader feed (see 'substack-cli feed overview').",
     )
-    p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    p.add_argument("--json", action="store_true", help=JSON_HELP)
     p.set_defaults(func=cmd_feed_overview, json=False)
     # `p` is a _CliArgumentParser (top-level subparsers were built with that
     # parser_class); propagate it so `feed <verb>` parse errors route through
@@ -192,9 +193,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     read_p.add_argument(
         "--cursor", default=None, help="Pagination cursor (home source only; from next_cursor)."
     )
-    read_p.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    read_p.add_argument("--json", action="store_true", help=JSON_HELP)
     read_p.set_defaults(func=cmd_feed_read)
 
     ov = noun_sub.add_parser("overview", help="Describe the feed noun's verb surface.")
-    ov.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    ov.add_argument("--json", action="store_true", help=JSON_HELP)
     ov.set_defaults(func=cmd_feed_overview)

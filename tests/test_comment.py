@@ -298,7 +298,8 @@ def test_comment_reply_top_level_posts_body_only_and_returns_id_and_url(
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["id"] == 99
-    assert "url" in payload and payload["url"]
+    assert "url" in payload
+    assert payload["url"]
     cmd = captured_cmd["cmd"]
     joined = " ".join(cmd)
     assert "parent_id" not in joined
@@ -438,7 +439,8 @@ def test_comment_delete_returns_id_and_url(
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["id"] == 99
-    assert "url" in payload and payload["url"]
+    assert "url" in payload
+    assert payload["url"]
 
 
 def test_comment_delete_with_post_builds_post_anchored_url(
