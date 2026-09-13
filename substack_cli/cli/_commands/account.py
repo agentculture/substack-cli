@@ -3,32 +3,35 @@
 Endpoint facts this module is built on (observed in the owner's logged-in
 browser; see task t5 / ``.devague`` plan for provenance):
 
+* ``GET https://<publication-host>/api/v1/subscription`` (session required)
+  returns ``{id, user_id, publication_id, email_disabled, ...}`` — this *is*
+  the whoami source: ``user_id`` is the signed-in user's account id.
 * ``GET https://<publication-host>/api/v1/publication`` returns the owner's
   publication object (``id``, ``subdomain``, ``name``, ``custom_domain``
   among its keys) when signed in, and answers ``403`` when not.
 * ``GET https://substack.com/api/v1/user/self`` answers ``403`` **even when
   signed in** — it is *not* a whoami source, so this module never calls it.
-* The account/user id is not present on the publication endpoint's response;
-  it is only observed as ``draft_bylines[0].id`` on drafts. Until a
-  drafts-derived path exists, ``whoami`` honestly reports ``user_id: null``
-  rather than fabricating one.
 * The sign-out signal is HTTP ``401`` with a JSON body shaped
   ``{"errors": [{"msg": "Please sign in", ...}]}`` — this is exactly what
   :func:`substack_cli.substack.webglass.map_failure` already maps to an
   environment error with a "log in again" remediation, so ``whoami`` does
   not re-implement that mapping; it just lets ``webglass.request`` raise.
 
-``whoami`` calls ``webglass.request("GET", ...)`` against the *publication*
-API base for the required ``--publication`` host — never the network
-directly, and never ``substack.com/api/v1/user/self``. Three states, all
-driven through ``webglass.request``/``session_required``/``map_failure``:
+``whoami`` makes two ``webglass.request("GET", ...)`` calls against the
+*publication* API base for the required ``--publication`` host — never the
+network directly, and never ``substack.com/api/v1/user/self`` — in this
+order: ``/subscription`` first (for ``user_id``), then ``/publication`` (for
+the publication block). Three states, all driven through
+``webglass.request``/``session_required``/``map_failure``:
 
 1. no ``$SUBSTACK_WEBGLASS_SESSION`` configured -> ``CliError(EXIT_ENV_ERROR)``
-   from :func:`webglass.session_required` ("no session named").
-2. a session is configured but the endpoint answers 401 -> the same
+   from :func:`webglass.session_required` ("no session named"), raised before
+   either call runs.
+2. a session is configured but either call answers 401 -> the same
    ``CliError(EXIT_ENV_ERROR)`` webglass's ``map_failure`` already raises for
-   a dead session, with a "log in again" remediation.
-3. the endpoint answers 200 -> ``whoami`` parses the JSON body and reports
+   a dead session, with a "log in again" remediation. ``/subscription`` is
+   called first, so a dead session never reaches ``/publication``.
+3. both calls answer 200 -> ``whoami`` parses the JSON bodies and reports
    ``{user_id, publication: {id, subdomain, name, custom_domain}}`` on
    stdout, exit 0.
 
@@ -76,49 +79,59 @@ def _webglass_version() -> str | None:
     return text or None
 
 
-def _publication_from_body(body: str) -> dict[str, Any]:
+def _response_body(result: dict[str, Any]) -> str:
+    response = result.get("content", {}).get("trusted", {}).get("response", {})
+    return str(response.get("body") or "")
+
+
+def _json_object_from_body(body: str, *, url: str) -> dict[str, Any]:
     try:
         parsed = json.loads(body)
     except json.JSONDecodeError as exc:
         raise CliError(
             EXIT_ENV_ERROR,
-            "webglass's publication response body was not valid JSON",
-            "run 'webglass request --method GET --url "
-            "https://<publication-host>/api/v1/publication --json' manually "
+            f"webglass's response body from {url} was not valid JSON",
+            f"run 'webglass request --method GET --url {url} --json' manually "
             "to inspect what came back",
         ) from exc
     if not isinstance(parsed, dict):
         raise CliError(
             EXIT_ENV_ERROR,
-            "webglass's publication response body was not a JSON object",
-            "run 'webglass request --method GET --url "
-            "https://<publication-host>/api/v1/publication --json' manually "
+            f"webglass's response body from {url} was not a JSON object",
+            f"run 'webglass request --method GET --url {url} --json' manually "
             "to inspect what came back",
         )
-    return {field: parsed.get(field) for field in _PUBLICATION_FIELDS}
+    return parsed
 
 
 def whoami_report(publication_host_arg: str) -> dict[str, Any]:
     """Probe the webglass session and return the ``{user_id, publication}`` report.
 
-    Raises ``CliError`` (via ``http.publication_host``, ``webglass.request``,
-    or this function's own body-parsing) for every non-authenticated state;
-    only returns normally once the endpoint answered 200 with a JSON object.
+    Two calls, in order: ``/subscription`` first (its ``user_id`` field is
+    the signed-in user's account id — see module docstring), then
+    ``/publication`` (the publication block). Raises ``CliError`` (via
+    ``http.publication_host``, ``webglass.request``, or this function's own
+    body-parsing) for every non-authenticated state; only returns normally
+    once *both* calls answered 200 with a JSON object.
     """
     host = http.publication_host(publication_host_arg)
-    url = f"{http.publication_base(host)}/publication"
+    base = http.publication_base(host)
 
-    result = webglass.request("GET", url)
+    subscription_url = f"{base}/subscription"
+    subscription_result = webglass.request("GET", subscription_url)
     # webglass.request already calls map_failure and raises on anything but a
     # succeeded lifecycle_state, so by this point the request succeeded.
-    response = result.get("content", {}).get("trusted", {}).get("response", {})
-    body = str(response.get("body") or "")
-    publication = _publication_from_body(body)
+    subscription = _json_object_from_body(_response_body(subscription_result), url=subscription_url)
+
+    publication_url = f"{base}/publication"
+    publication_result = webglass.request("GET", publication_url)
+    publication_body = _json_object_from_body(
+        _response_body(publication_result), url=publication_url
+    )
+    publication = {field: publication_body.get(field) for field in _PUBLICATION_FIELDS}
 
     return {
-        # Not derivable from the publication endpoint (see module docstring);
-        # honestly reported as null rather than guessed.
-        "user_id": None,
+        "user_id": subscription.get("user_id"),
         "publication": publication,
     }
 

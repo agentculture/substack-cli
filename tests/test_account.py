@@ -11,9 +11,16 @@ Every case drives the three webglass auth states through the fake `webglass`
 executable (tests/fakes/webglass/webglass) — never the network:
 
 * no ``$SUBSTACK_WEBGLASS_SESSION`` -> "no session named" (env error, code 2)
-* a session is set but the publication endpoint answers 401 -> "session
-  present but dead" (env error, code 2)
-* a session is set and the endpoint answers 200 -> authenticated (code 0)
+* a session is set but a call answers 401 -> "session present but dead"
+  (env error, code 2)
+* a session is set and both calls answer 200 -> authenticated (code 0),
+  ``user_id`` sourced from ``/subscription`` and the publication block from
+  ``/publication``
+
+``whoami`` now makes two calls (``/subscription`` then ``/publication``), so
+the authenticated-state tests use the fake's
+``WEBGLASS_FAKE_RESPONSE_BY_URL`` support to hand back a different canned
+body per URL.
 """
 
 from __future__ import annotations
@@ -78,10 +85,21 @@ def _set_canned_response(monkeypatch: pytest.MonkeyPatch, payload: dict) -> None
     monkeypatch.setenv("WEBGLASS_FAKE_RESPONSE", json.dumps(payload))
 
 
+def _set_canned_response_by_url(monkeypatch: pytest.MonkeyPatch, by_url: dict[str, dict]) -> None:
+    """Give the fake webglass a different canned response per URL substring.
+
+    ``whoami`` makes two calls (``/subscription`` then ``/publication``); this
+    drives them independently via the fake's ``WEBGLASS_FAKE_RESPONSE_BY_URL``
+    support.
+    """
+    monkeypatch.setenv("WEBGLASS_FAKE_RESPONSE_BY_URL", json.dumps(by_url))
+
+
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SUBSTACK_WEBGLASS_SESSION", raising=False)
     monkeypatch.delenv("WEBGLASS_FAKE_RESPONSE", raising=False)
+    monkeypatch.delenv("WEBGLASS_FAKE_RESPONSE_BY_URL", raising=False)
     monkeypatch.delenv("SUBSTACK_API_BASE", raising=False)
 
 
@@ -175,27 +193,36 @@ def test_account_whoami_session_present_but_401_is_env_error(
     assert "log in again" in err.lower()
 
 
-def test_account_whoami_authenticated_reports_publication_json(
+def test_account_whoami_authenticated_reports_user_id_and_publication_json(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _prepend_fake_webglass_to_path(monkeypatch)
     monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
+    subscription = {
+        "id": 99,
+        "user_id": 7777,
+        "publication_id": 4242,
+        "email_disabled": False,
+    }
     publication = {
         "id": 4242,
         "subdomain": "example",
         "name": "Example Publication",
         "custom_domain": None,
     }
-    _set_canned_response(
+    _set_canned_response_by_url(
         monkeypatch,
-        _http_result(status=200, body=json.dumps(publication)),
+        {
+            "/subscription": _http_result(status=200, body=json.dumps(subscription)),
+            "/publication": _http_result(status=200, body=json.dumps(publication)),
+        },
     )
 
     rc = run(["account", "whoami", "--publication", "example.substack.com", "--json"])
     assert rc == EXIT_SUCCESS
     payload = json.loads(capsys.readouterr().out)
+    assert payload["user_id"] == 7777
     assert payload["publication"] == publication
-    assert "user_id" in payload
 
 
 def test_account_whoami_authenticated_reports_publication_text(
@@ -203,23 +230,54 @@ def test_account_whoami_authenticated_reports_publication_text(
 ) -> None:
     _prepend_fake_webglass_to_path(monkeypatch)
     monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
+    subscription = {"id": 99, "user_id": 7777, "publication_id": 4242}
     publication = {
         "id": 4242,
         "subdomain": "example",
         "name": "Example Publication",
         "custom_domain": "example.com",
     }
-    _set_canned_response(
+    _set_canned_response_by_url(
         monkeypatch,
-        _http_result(status=200, body=json.dumps(publication)),
+        {
+            "/subscription": _http_result(status=200, body=json.dumps(subscription)),
+            "/publication": _http_result(status=200, body=json.dumps(publication)),
+        },
     )
 
     rc = run(["account", "whoami", "--publication", "example.substack.com"])
     assert rc == EXIT_SUCCESS
     out = capsys.readouterr().out
+    assert "7777" in out
     assert "example" in out
     assert "Example Publication" in out
     assert "example.com" in out
+
+
+def test_account_whoami_401_on_publication_after_subscription_succeeds_is_env_error(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A session that dies between the two calls is still an env error, not a crash."""
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
+    subscription = {"id": 99, "user_id": 7777, "publication_id": 4242}
+    _set_canned_response_by_url(
+        monkeypatch,
+        {
+            "/subscription": _http_result(status=200, body=json.dumps(subscription)),
+            "/publication": _http_result(
+                status=401,
+                body=json.dumps({"errors": [{"msg": "Please sign in"}]}),
+                lifecycle_state="failed",
+            ),
+        },
+    )
+
+    rc = run(["account", "whoami", "--publication", "example.substack.com"])
+    assert rc == EXIT_ENV_ERROR
+    err = capsys.readouterr().err
+    assert err.startswith("error:")
+    assert "log in again" in err.lower()
 
 
 def test_account_whoami_invalid_publication_host_is_user_error(
@@ -235,12 +293,33 @@ def test_account_whoami_invalid_publication_host_is_user_error(
     assert "hint:" in err
 
 
-def test_account_whoami_malformed_publication_body_is_env_error(
+def test_account_whoami_malformed_subscription_body_is_env_error(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _prepend_fake_webglass_to_path(monkeypatch)
     monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
     _set_canned_response(monkeypatch, _http_result(status=200, body="not-json-at-all"))
+
+    rc = run(["account", "whoami", "--publication", "example.substack.com"])
+    assert rc == EXIT_ENV_ERROR
+    err = capsys.readouterr().err
+    assert err.startswith("error:")
+    assert "hint:" in err
+
+
+def test_account_whoami_malformed_publication_body_is_env_error(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
+    subscription = {"id": 99, "user_id": 7777, "publication_id": 4242}
+    _set_canned_response_by_url(
+        monkeypatch,
+        {
+            "/subscription": _http_result(status=200, body=json.dumps(subscription)),
+            "/publication": _http_result(status=200, body="not-json-at-all"),
+        },
+    )
 
     rc = run(["account", "whoami", "--publication", "example.substack.com"])
     assert rc == EXIT_ENV_ERROR

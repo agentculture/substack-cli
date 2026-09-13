@@ -7,9 +7,18 @@ substack_cli.substack.webglass can be exercised without depending on the real
 webglass-cli tool being installed or reachable.
 
 Canned response selection (checked in this order):
-  1. ``WEBGLASS_FAKE_RESPONSE_FILE`` — path to a JSON file to print verbatim.
-  2. ``WEBGLASS_FAKE_RESPONSE`` — a JSON string to print verbatim.
-  3. Fallback: a minimal "succeeded" WebOperationResult.
+  1. ``WEBGLASS_FAKE_RESPONSE_BY_URL`` — a JSON *object* mapping a URL
+     substring to a canned response (object, or JSON-encoded string) for that
+     call. The invocation's ``--url <value>`` argument is matched against
+     each key by substring containment; the first matching key (in the
+     object's own key order) wins. Callers that make more than one request
+     with different URLs in a single command (e.g. ``account whoami``, which
+     hits both ``/subscription`` and ``/publication``) use this to return a
+     different canned body per call. Falls through to steps 2-4 below when
+     no ``--url`` argument is present, or none of the keys match.
+  2. ``WEBGLASS_FAKE_RESPONSE_FILE`` — path to a JSON file to print verbatim.
+  3. ``WEBGLASS_FAKE_RESPONSE`` — a JSON string to print verbatim.
+  4. Fallback: a minimal "succeeded" WebOperationResult.
 
 The fake also honors ``WEBGLASS_FAKE_EXIT`` (an integer exit code to return)
 so tests can simulate a nonzero exit alongside the JSON body, and
@@ -32,11 +41,42 @@ DEFAULT_RESULT = {
 }
 
 
+def _url_arg(argv: list[str]) -> str | None:
+    for i, token in enumerate(argv):
+        if token == "--url" and i + 1 < len(argv):
+            return argv[i + 1]
+        if token.startswith("--url="):
+            return token[len("--url=") :]
+    return None
+
+
+def _response_by_url(argv: list[str]) -> str | None:
+    raw_map = os.environ.get("WEBGLASS_FAKE_RESPONSE_BY_URL")
+    if not raw_map:
+        return None
+    url = _url_arg(argv)
+    if url is None:
+        return None
+    try:
+        by_url = json.loads(raw_map)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(by_url, dict):
+        return None
+    for key, value in by_url.items():
+        if key in url:
+            return value if isinstance(value, str) else json.dumps(value)
+    return None
+
+
 def main() -> int:
+    response_by_url = _response_by_url(sys.argv[1:])
     response_file = os.environ.get("WEBGLASS_FAKE_RESPONSE_FILE")
     response_text = os.environ.get("WEBGLASS_FAKE_RESPONSE")
 
-    if response_file:
+    if response_by_url is not None:
+        payload = response_by_url
+    elif response_file:
         with open(response_file, "r", encoding="utf-8") as handle:
             payload = handle.read()
     elif response_text:
