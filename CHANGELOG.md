@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-09-13
+
+### Added
+
+- **`account` noun** — `whoami` (probe the webglass session against a
+  publication's API and report the authenticated account, three-state: no
+  session, dead session, authenticated) and `overview` (report webglass
+  presence/version; never fails on a missing install).
+- **`post` noun** — `list`, `get`, `publish`, `schedule`, `unpublish`,
+  `delete`, and `overview`.
+- **`comment` noun** — `list` (public), `reply` (top-level or threaded via
+  `--parent`, owner-only via webglass), `delete` (owner-only via webglass),
+  and `overview`.
+- **`reaction` noun** — `list` (public aggregate counts), `add` and `remove`
+  (post or comment, owner-only via webglass), and `overview`.
+- **`feed` noun** — `read` and `overview`.
+- `substack_cli/substack/http.py` — a stdlib-only HTTP transport (no
+  third-party dependency) for the public, unauthenticated Substack API calls.
+- `substack_cli/substack/webglass.py` — a subprocess adapter that shells out
+  to `webglass-cli` for every owner-scoped call (session-backed reads and all
+  writes), keeping credential handling out of this process.
+- `substack_cli/substack/render.py` — an untrusted-text renderer for post,
+  comment, and feed content pulled from the Substack API.
+- `substack_cli/substack/body.py` — a markdown-to-ProseMirror body builder for
+  post creation and updates.
+- `docs/api/substack-endpoints.md` — the endpoint reference the `http.py` and
+  `webglass.py` clients are written against.
+
+### Notes
+
+- Owner-scoped verbs (`account whoami`, `post publish`/`schedule`/`unpublish`/
+  `delete`, `comment reply`/`delete`, `reaction add`/`remove`) report exit `2`
+  until `webglass-cli` ships authenticated sessions
+  (agentculture/webglass-cli#17).
+
 ## [0.9.1] - 2026-09-12
 
 ### Changed
