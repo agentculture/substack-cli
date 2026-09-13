@@ -5,17 +5,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** *(planned — see Status below)* — publish and schedule posts, read
-posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
+account** — publish and schedule posts, read posts and comments, react to
+posts/comments, and read the account feed. Unofficial community tool, not
 affiliated with Substack.
 
-**Status: scaffold.** None of that domain surface exists on disk yet. What is
-checked in today is the AgentCulture sibling baseline this repo was scaffolded
-from (`culture-agent-template`): the agent-first CLI skeleton (`whoami`,
-`learn`, `explain`, `overview`, `doctor`, `cli overview`), a mesh identity, the
-vendored guildmaster skill kit, and a buildable/deployable package baseline.
-The Substack nouns/verbs are the work ahead — see
-[Adding the Substack surface](#adding-the-substack-surface-planned).
+Five nouns are wired: `account`, `post`, `comment`, `reaction`, `feed`. Public
+read verbs (`post list`/`get`, `comment list`, `reaction list`) are stdlib
+HTTP with no session. Owner verbs (`post publish`/`schedule`/`unpublish`/
+`delete`, `comment reply`/`delete`, `reaction add`/`remove`, `feed read`,
+`account whoami`) shell out to the `webglass` binary (sibling project
+`webglass-cli`) and need `$SUBSTACK_WEBGLASS_SESSION` naming a session whose
+browser is already logged in to Substack — see
+[Substack surface](#substack-surface) below. The AgentCulture sibling baseline
+this repo was scaffolded from (`culture-agent-template`) is still underneath:
+the agent-first CLI skeleton (`whoami`, `learn`, `explain`, `overview`,
+`doctor`, `cli overview`), a mesh identity, the vendored guildmaster skill kit,
+and a buildable/deployable package baseline.
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the **skills supplier**), [`steward`](https://github.com/agentculture/steward)
@@ -97,16 +102,31 @@ every command takes `--json`; any noun with action-verbs must also expose
 /no/such/path` exits `0` — see `_commands/overview.py`). `learn` must keep
 covering purpose, command map, exit codes, `--json`, and `explain`.
 
-## Adding the Substack surface (planned)
+## Substack surface
+
+The domain layer lives in `substack_cli/substack/`: `http.py` (stdlib HTTP for
+the public read verbs), `webglass.py` (subprocess wrapper around the
+`webglass` binary for owner verbs), `render.py` and `body.py` (ProseMirror
+body construction for post/comment writes). Tests for it live under
+`tests/fakes/`. Owner verbs currently exit `2` with a hint: `webglass-cli`
+cannot yet create an authenticated, headed-login session
+(`agentculture/webglass-cli#17`), only drive an existing one. `post publish`
+is draft-first — without `--send` it only creates a draft; `--send
+--no-email` publishes without notifying subscribers; `--send` alone emails
+every subscriber and cannot be recalled.
 
 Work forwards from the existing shape, not around it: a new noun is a module
 under `cli/_commands/` with `register(sub)`, a line in `_build_parser()`, a
 catalog entry in `explain/catalog.py`, a row in `learn.py`'s text **and** JSON
-payload, and tests. Credentials (Substack session cookies / API tokens) must
-come from the environment — `scripts/scan-secrets.py` runs in CI and fails on
-committed credentials and non-localhost endpoints. For anything non-trivial,
-use `/think` → `/spec-to-plan` before writing code; that is what the vendored
-devague skills are here for.
+payload, and tests. Every endpoint the CLI calls must appear in
+[`docs/api/substack-endpoints.md`](docs/api/substack-endpoints.md) before it
+ships — that file is the only record of what Substack's unpublished API
+actually does, observed against a real logged-in session. Credentials
+(Substack session cookies / API tokens) must come from the environment —
+`scripts/scan-secrets.py` runs in CI and fails on committed credentials and
+non-localhost endpoints. For anything non-trivial, use `/think` →
+`/spec-to-plan` before writing code; that is what the vendored devague skills
+are here for.
 
 ## Identity and the four harnesses
 
@@ -183,20 +203,22 @@ scripts; a fix belongs upstream, then re-sync per `docs/skill-sources.md`.
   (`.github/workflows/publish.yml`); PRs do a TestPyPI dry-run. Configure the
   `pypi` / `testpypi` GitHub environments and a PyPI Trusted Publisher before
   the publish job can succeed.
-- Keep this file grounded in **checked-in reality**. The Substack surface is
-  aspirational today; anything that runs ahead of disk goes under a `(planned)`
-  marker or a `## Roadmap` heading.
+- Keep this file grounded in **checked-in reality**. Anything that runs ahead
+  of disk goes under a `(planned)` marker or a `## Roadmap` heading.
 
 ## Layout
 
 ```text
 substack_cli/             agent-first CLI (cited from teken's python-cli reference)
   cli/                    parser, error/output contract, _commands/ (verbs)
+  substack/               domain layer: http.py, webglass.py, render.py, body.py
   explain/                markdown catalog for `explain`
 tests/                    CLI smoke, introspection, harness-registry, script tests
+tests/fakes/              fakes for the Substack domain layer
 scripts/                  scan-secrets.py, harness-smoke.py (both CI gates)
 .claude/skills/           vendored guildmaster skill kit (cite-don't-import)
-docs/                     skill provenance + the four-harness contract/verification
+docs/                     skill provenance, four-harness contract/verification,
+                          docs/api/substack-endpoints.md (observed endpoint map)
 culture.yaml              mesh identity (suffix + backend)
 .github/workflows/        tests.yml (test/lint/harness-smoke/version-check), publish.yml
 ```
