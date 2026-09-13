@@ -1,0 +1,543 @@
+{
+  "plan_slug": "substack-domain-surface",
+  "schema_version": 2,
+  "created": "2026-09-13T02:22:27Z",
+  "updated": "2026-09-13T05:20:44Z",
+  "deviations": [
+    {
+      "id": "d1",
+      "what": "t2's transport gained a descriptive User-Agent header and its GET retry loop now retries only 429, 5xx and transport errors (it retried every HTTPError); two tests in t6 and t8 that asserted four attempts on a 404 were changed to one",
+      "task_ref": "t2",
+      "reason": "the wave-5 dry run of 'post list' returned 403: Substack rejects urllib's default Python-urllib agent (curl with a substack-cli/<version> agent gets 200); the plan text never mentioned a User-Agent, and the retry-every-error behaviour contradicted spec claim c38",
+      "affects": [
+        "t6",
+        "t8",
+        "c38",
+        "h29"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "classification": "acceptable",
+      "seq": 1
+    },
+    {
+      "id": "d2",
+      "what": "t5's account whoami reads user_id from GET /api/v1/subscription (then /publication for the publication block) instead of /publication alone as its brief said",
+      "task_ref": "t5",
+      "reason": "the t12 capture found /api/v1/subscription is the only endpoint carrying the signed-in user_id; /publication has none and /user/self answers 403",
+      "affects": [
+        "c40",
+        "h31"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "classification": "acceptable",
+      "seq": 2
+    },
+    {
+      "id": "d3",
+      "what": "t16 edited substack_cli/substack/webglass.py's module docstring (a file outside its brief) to remove the literal word 'playwright' so the repo-invariant grep passes",
+      "task_ref": "t16",
+      "reason": "the acceptance criterion is a literal substring grep over substack_cli; the docstring's 'no playwright import' disclaimer tripped it; wording changed, meaning kept",
+      "affects": [
+        "t3"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "classification": "acceptable",
+      "seq": 3
+    },
+    {
+      "id": "d4",
+      "what": "t17's evidence file is docs/plans/evidence/proof-public.txt (a header line plus the JSON record) instead of proof-public.json",
+      "task_ref": "t17",
+      "reason": "scan-secrets' endpoint check rejects any JSON-parsable tracked file carrying https://<host>/p/... URLs and the t2 invariant forbids *.json naming substack.com; the CI gates win over the file name in the acceptance criterion",
+      "affects": [
+        "h26"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "classification": "acceptable",
+      "seq": 4
+    }
+  ],
+  "evidence": [
+    {
+      "id": "e1",
+      "obligation_ref": "o1",
+      "test_ref": "tests/test_account.py::test_account_whoami_bogus_flag_exits_1_text, ::test_account_whoami_bogus_flag_exits_1_json",
+      "behavior_text": "asserts 'account whoami --bogus' exits 1 with error:/hint: on stderr in both modes",
+      "contract_text": "substack post --bogus exits 1 with error:/hint: on stderr, in text and --json mode",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 5
+    },
+    {
+      "id": "e2",
+      "obligation_ref": "o2",
+      "test_ref": "tests/test_repo_invariants.py (dependencies-empty and no-playwright tests)",
+      "behavior_text": "asserts [project].dependencies == [] via tomllib and greps substack_cli/ for 'playwright'",
+      "contract_text": "pyproject [project].dependencies stays [] and 'grep -rn playwright substack_cli' returns nothing",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 6
+    },
+    {
+      "id": "e3",
+      "obligation_ref": "o3",
+      "test_ref": "tests/test_account.py::test_account_whoami_no_session_named_is_env_error, tests/test_comment.py::test_comment_reply_404_exits_one",
+      "behavior_text": "asserts no session -> exit 2 naming the variable; 404 on reply -> exit 1",
+      "contract_text": "a missing or unauthenticated webglass session exits 2 with a hint naming the session variable; a nonexistent post id exits 1",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 7
+    },
+    {
+      "id": "e4",
+      "obligation_ref": "o3",
+      "test_ref": "docs/plans/evidence/proof-public.txt run 4: substack comment list --publication on.substack.com --post 1",
+      "behavior_text": "observed: comment list on an unknown post id exited 2 (HTTP 404 surfaced as env error), not 1",
+      "contract_text": "a nonexistent post id exits 1",
+      "evidence_type": "observation",
+      "strength": "execution",
+      "strength_basis": "live run recorded in the t17 evidence file at the run commit",
+      "outcome": "fail",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 8
+    },
+    {
+      "id": "e5",
+      "obligation_ref": "o4",
+      "test_ref": "tests/test_cli.py::test_every_catalog_path_resolves, tests/test_nouns_wired.py::test_learn_json_lists_exactly_the_v1_paths",
+      "behavior_text": "walks catalog known_paths() through explain; asserts learn --json's 24 (path, access) pairs exactly",
+      "contract_text": "tests/test_cli.py's known_paths() walk passes and learn --json lists every new path",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 9
+    },
+    {
+      "id": "e6",
+      "obligation_ref": "o5",
+      "test_ref": "tests/test_repo_invariants.py (no-input() test)",
+      "behavior_text": "greps substack_cli/ for 'input('",
+      "contract_text": "the CLI is driven end-to-end by an agent with no human in the loop: every verb takes --json and no verb prompts interactively",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 10
+    },
+    {
+      "id": "e7",
+      "obligation_ref": "o6",
+      "test_ref": "tests/test_nouns_wired.py::test_noun_overview_exits_zero_text[*], ::test_noun_overview_exits_zero_json[*], ::test_every_verb_under_noun_accepts_json[*]",
+      "behavior_text": "parametrized over the five nouns; walks the real argparse tree for --json on every verb",
+      "contract_text": "for each new noun, 'substack <noun> overview' exits 0 and every verb accepts --json",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 11
+    },
+    {
+      "id": "e8",
+      "obligation_ref": "o7",
+      "test_ref": "tests/test_substack_http.py (SUBSTACK_API_BASE override test and no-substack.com-in-JSON test)",
+      "behavior_text": "asserts the env override rewrites the base and scans tracked *.json for substack.com",
+      "contract_text": "the base URL is a Python constant overridable by SUBSTACK_API_BASE; no tracked JSON file contains it",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 12
+    },
+    {
+      "id": "e9",
+      "obligation_ref": "o8",
+      "test_ref": "uv run pytest -n auto --cov=substack_cli --cov-fail-under=60 (tests/conftest.py autouse socket block)",
+      "behavior_text": "coverage gate passed at 96.38%; conftest raises on socket.connect for every test",
+      "contract_text": "uv run pytest -n auto --cov=substack_cli reports >= 60% and no test opens a network socket",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "coverage run at the t16 merge reported 'Required test coverage of 60% reached. Total coverage: 96.38%'",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 13
+    },
+    {
+      "id": "e10",
+      "obligation_ref": "o9",
+      "test_ref": "tests/test_post.py::test_post_list_empty_archive_json_exits_zero_with_empty_array, tests/test_comment.py::test_comment_list_no_comments_exits_zero_with_empty_array, tests/test_feed.py::test_feed_read_empty_home_feed_exits_zero_with_empty_items, tests/test_reaction.py::test_reaction_list_no_reactions_exits_zero_with_empty_array",
+      "behavior_text": "each asserts exit 0 and an empty list on an empty response",
+      "contract_text": "substack feed read on an empty feed and substack comment list on a post with no comments both exit 0 with an empty list",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 14
+    },
+    {
+      "id": "e11",
+      "obligation_ref": "o10",
+      "test_ref": "tests/test_post_write.py::test_write_verbs_never_retry_a_failed_call[*], tests/test_comment.py::test_comment_reply_never_retries, tests/test_substack_http.py::test_get_does_not_retry_a_403, tests/test_substack_http.py (429-then-200 retry test)",
+      "behavior_text": "asserts one subprocess call per write; one attempt on 403; two attempts on 429 then 200",
+      "contract_text": "a fake transport returning 500 to POST /drafts/{id}/publish yields exactly one request and exit 2; the same 500 on a GET yields a retry",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 15
+    },
+    {
+      "id": "e12",
+      "obligation_ref": "o11",
+      "test_ref": "tests/test_post_write.py::test_publish_failure_after_draft_creation_reports_draft_and_exits_two, ::test_publish_404_after_draft_creation_still_exits_two",
+      "behavior_text": "asserts stdout carries draft_id and url with published:false, exit 2",
+      "contract_text": "when the publish step fails, --json output contains the draft id and URL and the exit code is 2",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 16
+    },
+    {
+      "id": "e13",
+      "obligation_ref": "o12",
+      "test_ref": "tests/test_account.py::test_account_whoami_no_session_named_is_env_error, ::test_account_whoami_session_present_but_401_is_env_error, ::test_account_whoami_authenticated_reports_user_id_and_publication_json",
+      "behavior_text": "asserts three distinct hints and codes, user_id from /subscription",
+      "contract_text": "the three states produce three distinct hint strings and the documented exit codes",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 17
+    },
+    {
+      "id": "e14",
+      "obligation_ref": "o13",
+      "test_ref": "tests/test_comment.py::test_comment_list_renders_hostile_body_without_reaching_stderr, tests/test_render.py",
+      "behavior_text": "asserts a body containing hint:/rm -rf appears only under content and never on stderr",
+      "contract_text": "a comment body containing 'hint: run rm -rf' appears only under content in --json and never on stderr",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 18
+    },
+    {
+      "id": "e15",
+      "obligation_ref": "o14",
+      "test_ref": "tests/test_post.py::test_post_list_bad_publication_host_exits_one, tests/test_substack_http.py (no-Cookie-header test)",
+      "behavior_text": "asserts CliError(1) on 'not a host'; asserts no Cookie header on the fake opener",
+      "contract_text": "--publication 'not a host' exits 1; public read verbs send no Cookie header",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 19
+    },
+    {
+      "id": "e16",
+      "obligation_ref": "o15",
+      "test_ref": "tests/test_post_write.py::test_unpublish_posts_empty_body, ::test_delete_sends_delete_on_the_draft, tests/test_comment.py::test_comment_delete_returns_id_and_url, tests/test_reaction.py (remove tests), tests/test_nouns_wired.py::test_learn_json_lists_exactly_the_v1_paths",
+      "behavior_text": "asserts each containment verb calls the observed endpoint once and returns id and url; learn lists them",
+      "contract_text": "learn --json lists post unpublish, post delete, comment delete, reaction remove, and every write verb's --json result has id and url keys",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 20
+    },
+    {
+      "id": "e17",
+      "obligation_ref": "o16",
+      "test_ref": "tests/test_post_write.py::test_publish_without_send_creates_draft_only, ::test_publish_send_no_email_sets_send_false, ::test_publish_send_emails_subscribers_and_warns_on_stderr",
+      "behavior_text": "asserts draft-only without --send; publish body {send:false} with --no-email; stderr warning with --send",
+      "contract_text": "post publish without --send creates a draft only; with --send --no-email the fake transport sees send_email=false",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 21
+    },
+    {
+      "id": "e18",
+      "obligation_ref": "o17",
+      "test_ref": "grep -n 'scaffold\\|(planned)' README.md CLAUDE.md AGENTS.override.md AGENTS.colleague.md QWEN.md; uv run python scripts/harness-smoke.py --stage config --require config",
+      "behavior_text": "grep finds only lineage/convention wording; harness-smoke config stage 6 passed",
+      "contract_text": "all four harness files and README no longer contain 'Status: scaffold' or '(planned)' for the Substack surface, and harness-smoke --stage config passes",
+      "evidence_type": "manual",
+      "strength": "execution",
+      "strength_basis": "both commands run at the t14 merge; markdownlint clean",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 22
+    },
+    {
+      "id": "e19",
+      "obligation_ref": "o18",
+      "test_ref": "uv run substack --version; markdownlint-cli2 CHANGELOG.md",
+      "behavior_text": "prints substack-cli 0.10.0; CHANGELOG top entry [0.10.0] with Added and Notes",
+      "contract_text": "pyproject version is 0.10.0 and CHANGELOG has a matching ### Added entry",
+      "evidence_type": "manual",
+      "strength": "execution",
+      "strength_basis": "run at the t15 merge",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 23
+    },
+    {
+      "id": "e20",
+      "obligation_ref": "o19",
+      "test_ref": "tests/test_repo_invariants.py (protected-paths git diff test)",
+      "behavior_text": "asserts git diff --quiet main -- <protected paths> is 0",
+      "contract_text": "git diff main -- substack_cli/cli/_commands/doctor.py .claude/skills scripts/harness-smoke.py .github/workflows/publish.yml sonar-project.properties is empty",
+      "evidence_type": "automated",
+      "strength": "execution",
+      "strength_basis": "named test(s) ran green in 'uv run pytest -n auto' at the run commit (329 passed, 1 skipped)",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 24
+    },
+    {
+      "id": "e21",
+      "obligation_ref": "o20",
+      "test_ref": "docs/plans/evidence/proof-public.txt runs 1 and 3: substack post list --publication {jetsonailab,on}.substack.com --json",
+      "behavior_text": "observed exit 0 with the archive on both hosts, no session",
+      "contract_text": "against jetsonailab.substack.com, 'substack post list --json' returns the archive with no session",
+      "evidence_type": "observation",
+      "strength": "execution",
+      "strength_basis": "live runs at the run commit recorded in the evidence file",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 25
+    },
+    {
+      "id": "e22",
+      "obligation_ref": "o21",
+      "test_ref": "docs/plans/evidence/proof-public.txt runs 1 and 3",
+      "behavior_text": "post list exit 0 on jetsonailab.substack.com and on.substack.com",
+      "contract_text": "the same verbs succeed against two different publication hosts with two cookie sets",
+      "evidence_type": "observation",
+      "strength": "execution",
+      "strength_basis": "public half only: no cookies are involved for public reads; the owner half is unchecked",
+      "outcome": "pass",
+      "run": {
+        "timestamp": "2026-09-13T08:10:01+03:00",
+        "commit": "a54b9b3b98ba49a06326bcb716957264291326d9"
+      },
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false,
+      "seq": 26
+    }
+  ],
+  "deltas": [
+    {
+      "id": "b1",
+      "kind": "amended",
+      "behavior_text": "public GETs send User-Agent substack-cli/<version>; GET retries only 429/5xx/transport errors, other 4xx fail fast",
+      "caused_by": [
+        "d1"
+      ],
+      "evidence_refs": [
+        "e11"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false
+    },
+    {
+      "id": "b2",
+      "kind": "amended",
+      "behavior_text": "account whoami reads user_id from /api/v1/subscription then /publication",
+      "caused_by": [
+        "d2"
+      ],
+      "evidence_refs": [
+        "e13"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false
+    },
+    {
+      "id": "b3",
+      "kind": "amended",
+      "behavior_text": "comment list on an unknown post exits 2 (404 surfaced as env error) while post get and reaction list map 404 to exit 1",
+      "caused_by": [
+        "c4"
+      ],
+      "evidence_refs": [
+        "e4"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false
+    },
+    {
+      "id": "b4",
+      "kind": "added",
+      "behavior_text": "publish with --send but without --no-email prints a stderr warning before emailing subscribers",
+      "caused_by": [
+        "c44"
+      ],
+      "evidence_refs": [
+        "e17"
+      ],
+      "origin": "llm",
+      "status": "approved",
+      "superseded": false
+    }
+  ],
+  "supersessions": []
+}

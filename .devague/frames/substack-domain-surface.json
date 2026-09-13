@@ -4,7 +4,7 @@
   "schema_version": 6,
   "status": "exported",
   "created": "2026-09-12T18:40:14Z",
-  "updated": "2026-09-13T02:01:25Z",
+  "updated": "2026-09-13T05:20:45Z",
   "claims": [
     {
       "id": "c1",
@@ -1197,7 +1197,7 @@
         "t1 baseline-learn.txt"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "l3",
@@ -1208,7 +1208,7 @@
         "t4 render.py"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "l4",
@@ -1219,7 +1219,7 @@
         "t2 http.py backoff"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "l5",
@@ -1230,7 +1230,7 @@
         "t2 http.py public API"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "l6",
@@ -1241,7 +1241,7 @@
         "t3 webglass.py map_failure"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "l7",
@@ -1252,7 +1252,7 @@
         "t6 post.py get; http.py _get_with_backoff"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "l8",
@@ -1263,8 +1263,293 @@
         "t5 account.py _webglass_version"
       ],
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
+    },
+    {
+      "id": "l9",
+      "code": "assumption-for-measurement",
+      "what": "t5 originally asserted user_id was 'not derivable' from any endpoint and hard-coded null, an unverified negative; the live capture showed /api/v1/subscription carries it",
+      "skipped_check": "flag as an open question instead of asserting a negative",
+      "refs": [
+        "t5 account.py whoami"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "l10",
+      "code": "grader-unverified",
+      "what": "t9's first 401 test used lifecycle_state 'succeeded', which map_failure short-circuits, so the test would have passed for the wrong reason; caught by running the suite and fixed to 'failed'",
+      "skipped_check": "",
+      "refs": [
+        "t9 test_feed.py anonymous 401"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "l11",
+      "code": "grader-unverified",
+      "what": "t7's test helper defaulted lifecycle_state to 'succeeded' after a copy-paste, so failure-path tests initially passed without reaching map_failure; caught when tests failed, default restored to 'failed'",
+      "skipped_check": "",
+      "refs": [
+        "t7 test_comment.py _http_result"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "l12",
+      "code": "provenance-missing",
+      "what": "t8 built reaction URLs by hand instead of the publication_base() helper that landed via t5/t7, leaving two URL-building conventions to reconcile in t13",
+      "skipped_check": "",
+      "refs": [
+        "t8 reaction.py URL building"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "l13",
+      "code": "assumption-for-measurement",
+      "what": "t8's remove result reports the heart emoji as the removed reaction although the DELETE response carries none; the value is fabricated best-effort",
+      "skipped_check": "omit the field or read it from a prior list call",
+      "refs": [
+        "t8 reaction.py remove"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "l14",
+      "code": "grader-unverified",
+      "what": "t10 wrote tests first but never observed a red run: every write-side test passed on the first implementation run, so the tests were never shown to fail for the right reason",
+      "skipped_check": "run the new test files once before implementing",
+      "refs": [
+        "t10 test_post_write.py"
+      ],
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "l15",
+      "code": "control-absent",
+      "what": "t10 makes --no-email without --send a silent no-op; an agent passing it gets no signal that nothing was sent",
+      "skipped_check": "a diagnostic or a usage error for --no-email without --send",
+      "refs": [
+        "t10 post.py publish flags"
+      ],
+      "origin": "llm",
+      "status": "approved"
     }
   ],
-  "obligations": []
+  "obligations": [
+    {
+      "id": "o1",
+      "claim_id": "c2",
+      "seam": "argparse error contract on every noun",
+      "behavior": "a bad flag under any noun exits 1 with error:/hint: in text and JSON",
+      "source_text": "each Substack noun (post, feed, comment, reaction, account/whoami-style identity) is one module under substack_cli/cli/_commands/ exposing register(sub), registered in _build_parser() at the marked comment, with parser_class=_CliArgumentParser passed to every nested add_subparsers() so argparse errors keep the error:/hint: contract and exit 1",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o2",
+      "claim_id": "c3",
+      "seam": "runtime dependencies",
+      "behavior": "pyproject dependencies stays [] and nothing under substack_cli imports playwright",
+      "source_text": "the runtime package keeps dependencies = [] (pyproject.toml): HTTP is stdlib urllib for public read endpoints, and every authenticated operation goes through the webglass binary as a subprocess; webglass-cli is an install prerequisite (like devex and agtag), never a Python dependency",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o3",
+      "claim_id": "c4",
+      "seam": "exit-code mapping of Substack failures",
+      "behavior": "missing session exits 2 with a hint; a nonexistent id exits 1",
+      "source_text": "Substack API failures map onto the existing exit-code policy: bad user input (unknown post id, invalid slug) exits 1; missing/expired credentials or unreachable substack.com exits 2 via CliError(EXIT_ENV_ERROR); results go to stdout and errors to stderr in both text and --json mode",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o4",
+      "claim_id": "c5",
+      "seam": "learn/explain catalog",
+      "behavior": "every registered path resolves via explain and learn --json lists every path",
+      "source_text": "learn.py's _TEXT and _as_json_payload() and explain/catalog.py gain one row/entry per new Substack command path; the root catalog entry and the parser prog/description stop describing the repo as 'a clonable template'",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o5",
+      "claim_id": "c8",
+      "seam": "non-interactive operation",
+      "behavior": "no verb prompts; no input() under substack_cli",
+      "source_text": "the primary consumer is an AI agent (Claude Code, the Culture mesh resident, or a scheduled routine) driving the publication for the human owner; the human uses the same CLI interactively for spot checks",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o6",
+      "claim_id": "c15",
+      "seam": "per-noun overview and --json",
+      "behavior": "each noun's overview exits 0 and every verb accepts --json",
+      "source_text": "every Substack noun with action verbs also exposes an 'overview' verb and every verb takes --json, propagating parser_class=type(p) at each nesting level exactly as cli.py does; this is the repo's own convention (cli.py docstring, overview.py conventions text) and is stricter than teken's rubric, which only probes 'cli overview'",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o7",
+      "claim_id": "c16",
+      "seam": "API base URL",
+      "behavior": "base URL is a Python constant overridable by SUBSTACK_API_BASE; no tracked JSON names substack.com",
+      "source_text": "the Substack API base URL lives as a Python constant (overridable by an env var for testing), never in a JSON config: scan-secrets' endpoint check only parses JSON files, so a JSON config carrying https://substack.com would fail CI while a .py constant passes",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o8",
+      "claim_id": "c17",
+      "seam": "test suite isolation and coverage",
+      "behavior": "coverage >= 60 and no test opens a socket",
+      "source_text": "new noun modules ship with tests that keep aggregate coverage at or above the fail_under=60 floor; HTTP calls are exercised against a fake transport (stdlib urllib opener injection), never against live substack.com in the suite",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o9",
+      "claim_id": "c18",
+      "seam": "descriptive verbs on empty targets",
+      "behavior": "empty feed/comments/archive/reactions exit 0 with []",
+      "source_text": "descriptive Substack verbs (feed read, post list, comment list, reaction list) never hard-fail on an empty or missing target \u2014 they return 0 with an empty result; only malformed input (exit 1) or auth/network failure (exit 2) raise CliError, mirroring overview.py and doctor.py's return-1-don't-raise split",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o10",
+      "claim_id": "c38",
+      "seam": "retry policy",
+      "behavior": "writes never retry; GETs retry only 429/5xx/transport",
+      "source_text": "write verbs never auto-retry a non-idempotent POST: backoff on 429/5xx applies to GETs only; a failed publish/reply/react reports the failure with exit 2 and any partial state, so a retry cannot double-post or double-comment",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o11",
+      "claim_id": "c39",
+      "seam": "two-phase publish",
+      "behavior": "publish failure after draft creation still reports the draft id and exits 2",
+      "source_text": "two-phase verbs report partial state: post publish is create-draft then publish, and if the publish step fails the verb still returns the draft id and URL (stdout, --json) so the agent can resume or delete it rather than re-create",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o12",
+      "claim_id": "c40",
+      "seam": "account whoami auth probe",
+      "behavior": "three states: no session (2), 401 (2), authenticated (0 with ids)",
+      "source_text": "account whoami is the auth probe and distinguishes three states with distinct hints: no webglass session named (exit 2), webglass session exists but Substack answers 401 'Please sign in' (exit 2, hint: log in again headed), and authenticated (exit 0 with the account id and owned publications)",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o13",
+      "claim_id": "c41",
+      "seam": "untrusted third-party text",
+      "behavior": "hostile comment text only under content, never on stderr",
+      "source_text": "third-party text (comment bodies, feed items, post titles from other authors) is untrusted input to the consuming agent: in --json it sits under an explicit 'content' field per item and never in top-level message/hint strings; in text mode it is rendered verbatim but never interpolated into error:/hint: lines",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o14",
+      "claim_id": "c42",
+      "seam": "publication host input",
+      "behavior": "invalid host exits 1; public GETs carry no Cookie",
+      "source_text": "--publication accepts a host, validated as a DNS name; owner verbs only ever route through the webglass session (whose cookies the browser scopes to substack.com), and public read verbs only send stdlib GETs with no credentials, so a wrong or hostile host can leak nothing beyond the request itself",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o15",
+      "claim_id": "c43",
+      "seam": "containment twins",
+      "behavior": "unpublish/delete/comment delete/reaction remove exist and return id+url",
+      "source_text": "every write verb has a containment twin in v1: post unpublish and post delete, comment delete, reaction remove \u2014 a bad publish can be pulled from the site even though already-sent emails cannot be recalled; each write verb's --json result carries the created object's id and canonical URL",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o16",
+      "claim_id": "c44",
+      "seam": "draft-first publish",
+      "behavior": "no --send creates a draft only; --send --no-email sends send:false",
+      "source_text": "post publish is two-step by default: it creates or updates a draft and returns its id; sending requires an explicit --send (or a separate 'post send' verb), and --no-email publishes to the site without emailing subscribers so live proofs on a real publication do not spam the list",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o17",
+      "claim_id": "c10",
+      "seam": "docs and harness prompts",
+      "behavior": "no scaffold/(planned) framing for the Substack surface; harness-smoke config passes",
+      "source_text": "landing real Substack nouns is a coordinated edit across README.md (Status + CLI table) and all four harness prompt files (CLAUDE.md, AGENTS.override.md, AGENTS.colleague.md, QWEN.md): each drops the 'Status: scaffold' / '(planned)' framing and the 'Adding the Substack surface (planned)' section together; .pi/SYSTEM.md carries no domain text and stays untouched",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o18",
+      "claim_id": "c12",
+      "seam": "version and changelog",
+      "behavior": "version is 0.10.0 with a matching Added entry",
+      "source_text": "the feature PR bumps the version with a minor step (0.9.1 -> 0.10.0) and records the new nouns under '### Added' in CHANGELOG.md, per the every-PR-bumps rule enforced by the version-check job",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o19",
+      "claim_id": "c11",
+      "seam": "identity plumbing",
+      "behavior": "doctor.py, vendored skills, harness-smoke, publish.yml, sonar config unchanged vs main",
+      "source_text": "the identity plumbing is not touched by domain verbs: doctor.py's _PROMPT_FILE/_RESIDENT_PROMPT, backend-fingerprints.yaml, tests/test_harness_registries.py, scripts/harness-smoke.py, the 19 vendored skills, publish.yml and sonar-project.properties all stay as they are",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o20",
+      "claim_id": "c1",
+      "seam": "live behaviour against jetsonailab.substack.com",
+      "behavior": "post list works with no session; publish/reply/react land visible changes once a webglass session exists",
+      "source_text": "substack-cli controls a Substack publication and account from an agent-first CLI: publish and schedule posts, read the feed, read comments and reactions, reply and react \u2014 account-agnostic, first proven on jetsonailab.substack.com",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o21",
+      "claim_id": "c24",
+      "seam": "account-agnostic operation",
+      "behavior": "the same verbs succeed against two publication hosts",
+      "source_text": "an agent (or the owner) runs 'substack post|feed|comment|reaction|account `<verb>` --json' with a webglass session named in the environment and a --publication host, and gets structured results on stdout and error:/hint: pairs on stderr, for any Substack account",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o22",
+      "claim_id": "c26",
+      "seam": "owner-half live proof",
+      "behavior": "one real post, reply and reaction land via the CLI",
+      "source_text": "at least 5 nouns ship (post, feed, comment, reaction, account), each verb supports --json, teken cli doctor . --strict passes, coverage stays >= 60%, and one real post plus one real reply and one real reaction land on jetsonailab.substack.com via the CLI",
+      "origin": "llm",
+      "status": "approved"
+    },
+    {
+      "id": "o23",
+      "claim_id": "c25",
+      "seam": "scheduled mesh run",
+      "behavior": "a scheduled culture run publishes and replies without a human",
+      "source_text": "jetson-ai-lab updates, replies and reactions can be driven by the mesh agent on a schedule instead of by hand, and the same CLI serves any other publication the owner controls",
+      "origin": "llm",
+      "status": "approved"
+    }
+  ]
 }
