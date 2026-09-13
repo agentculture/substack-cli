@@ -214,7 +214,8 @@ def test_requests_carry_a_descriptive_user_agent() -> None:
     http.get_json("example.substack.com", "archive")
 
     ua = opener.requests[0].headers.get("User-agent")
-    assert ua is not None and ua.startswith("substack-cli/")
+    assert ua is not None
+    assert ua.startswith("substack-cli/")
     assert "Python-urllib" not in ua
 
 

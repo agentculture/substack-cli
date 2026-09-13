@@ -246,7 +246,7 @@ def _send_once(url: str, method: str, data: Optional[dict[str, Any]]) -> dict[st
     try:
         with opener.open(request, timeout=timeout) as response:
             payload = response.read()
-    except (urllib.error.HTTPError, urllib.error.URLError, *_TIMEOUT_EXCEPTIONS) as exc:
+    except (urllib.error.URLError, *_TIMEOUT_EXCEPTIONS) as exc:
         if _is_timeout(exc):
             # A write never retries, and a timed-out write is no different:
             # the server may well have applied it, so one CliError(2) and out.
@@ -285,7 +285,7 @@ def _get_with_backoff(url: str) -> dict[str, Any]:
             # Decoding failures raise CliError(2) straight out of the loop:
             # a malformed payload is not a transport hiccup, so no retry.
             return _decode(payload, "GET", url)
-        except (urllib.error.HTTPError, urllib.error.URLError, *_TIMEOUT_EXCEPTIONS) as exc:
+        except (urllib.error.URLError, *_TIMEOUT_EXCEPTIONS) as exc:
             last_exc = exc
             if not _is_retryable(exc):
                 break
