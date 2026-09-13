@@ -43,6 +43,12 @@ _DEFAULT_OFFSET = 0
 # module re-maps it by reading the status back out of that message.
 _HTTP_ERROR_STATUS_RE = re.compile(r"HTTP Error (\d{3})")
 
+#: Remediation for every --body-json rejection: unparseable, or parseable but
+#: not a ProseMirror document.
+_PROSEMIRROR_REMEDIATION = (
+    'pass a file containing a ProseMirror document ({"type": "doc", "content": [...]})'
+)
+
 _VERBS = [
     "post list --publication <host> [--limit N] [--offset N] — list a publication's archive",
     "post get <slug> --publication <host> — fetch one post by slug",
@@ -172,7 +178,16 @@ def _read_file(path: str, kind: str) -> str:
 
 
 def _draft_body(args: argparse.Namespace) -> str:
-    """Return the ``draft_body`` string from --markdown or --body-json."""
+    """Return the ``draft_body`` string from --markdown or --body-json.
+
+    A ``--body-json`` file must decode to a *ProseMirror document*: a
+    top-level object with ``"type": "doc"`` and a list-valued ``content``.
+    Anything else (``null``, a bare array of nodes, a scalar, ``{}``, or a
+    single ``paragraph`` node someone pulled out of a document) is rejected
+    here with ``CliError(1)`` — valid JSON that Substack's editor cannot
+    load. Catching it locally costs nothing; letting it through creates a
+    draft whose body silently fails to render.
+    """
     if args.body_json:
         raw = _read_file(args.body_json, "body-json")
         try:
@@ -181,9 +196,19 @@ def _draft_body(args: argparse.Namespace) -> str:
             raise CliError(
                 code=1,
                 message=f"--body-json file {args.body_json!r} is not valid JSON: {exc}",
-                remediation="pass a file containing a ProseMirror document "
-                '({"type": "doc", "content": [...]})',
+                remediation=_PROSEMIRROR_REMEDIATION,
             ) from exc
+        if (
+            not isinstance(document, dict)
+            or document.get("type") != "doc"
+            or not isinstance(document.get("content"), list)
+        ):
+            raise CliError(
+                code=1,
+                message=f"--body-json file {args.body_json!r} is not a ProseMirror document "
+                '(needs a top-level object with "type": "doc" and a list "content")',
+                remediation=_PROSEMIRROR_REMEDIATION,
+            )
         return json.dumps(document, ensure_ascii=False)
     return body.to_draft_body(_read_file(args.markdown, "markdown"))
 
@@ -204,7 +229,15 @@ def _current_user_id(host: str) -> int:
 
 
 def cmd_post_publish(args: argparse.Namespace) -> int:
-    """Create a draft, and with --send publish it. Never retries either step."""
+    """Create a draft, and with --send publish it. Never retries either step.
+
+    ``--send`` without ``--no-email`` posts ``send: true``, which emails the
+    publication's subscribers. That path is **unverified**: only the
+    ``send: false`` (web-only) publish was exercised against the live API,
+    and ``docs/api/substack-endpoints.md`` records ``send: true`` as "not
+    exercised". Hence the stderr warning before an emailing publish -- the
+    irreversible branch is the one nobody has watched work.
+    """
     json_mode = bool(getattr(args, "json", False))
     host = http.publication_host(args.publication)
     # Build the body *before* any network call so unsupported markdown fails
@@ -408,7 +441,12 @@ def register(sub: argparse._SubParsersAction) -> None:
     pub_p.add_argument("--title", required=True, help="Post title.")
     pub_p.add_argument("--subtitle", default="", help="Post subtitle.")
     pub_p.add_argument(
-        "--send", action="store_true", help="Publish the draft (not just create it)."
+        "--send",
+        action="store_true",
+        help="Publish the draft (not just create it). NOTE: only the "
+        "--send --no-email path (send: false) has been exercised against the "
+        "live API; the emailing path (send: true) is unverified and is "
+        "recorded as 'not exercised' in docs/api/substack-endpoints.md.",
     )
     pub_p.add_argument(
         "--no-email",

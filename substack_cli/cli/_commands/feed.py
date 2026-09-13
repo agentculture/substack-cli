@@ -17,6 +17,10 @@ Two sources, selected with ``--source``:
 * ``following`` — ``GET feed/following?limit=N`` -> a bare JSON array. Not
   paginated in the observed contract, so ``next_cursor`` is always ``null``.
 
+Both queries are built with ``urllib.parse.urlencode``: a cursor is an
+opaque token that can contain ``&``/``#``/``+``/``%``, and interpolating one
+raw into the URL would let it forge or truncate the query.
+
 Item shapes were not captured for either endpoint (see the Feed section's
 "not captured" note), so items are treated as opaque dicts: :func:`_to_render_item`
 builds a render.py item from whichever of ``id``/``name``/``author.name``/
@@ -30,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 from typing import Any
+from urllib.parse import urlencode
 
 from substack_cli.cli._commands.overview import emit_overview
 from substack_cli.cli._errors import CliError
@@ -111,12 +116,18 @@ def cmd_feed_read(args: argparse.Namespace) -> int:
     source = args.source
     base = http.account_base().rstrip("/")
 
+    # urlencode, never f-string interpolation: a cursor is an opaque token
+    # handed back by the API (or typed by a caller) and may contain '&', '#',
+    # '+' or '%'. Pasted raw into the query it would forge or truncate
+    # params; percent-encoded it round-trips as the single value it is.
+    params: list[tuple[str, str]] = [("limit", str(args.limit))]
     if source == "following":
-        url = f"{base}/feed/following?limit={args.limit}"
+        path = "feed/following"
     else:
-        url = f"{base}/reader/feed?limit={args.limit}"
+        path = "reader/feed"
         if args.cursor:
-            url = f"{url}&cursor={args.cursor}"
+            params.append(("cursor", str(args.cursor)))
+    url = f"{base}/{path}?{urlencode(params)}"
 
     result = webglass.request("GET", url)
     body = _response_body(result)

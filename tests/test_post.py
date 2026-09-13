@@ -230,3 +230,29 @@ def test_post_get_server_error_exits_two_not_one(capsys: pytest.CaptureFixture[s
     rc = run(["post", "get", "hello-world", "--publication", "example.substack.com", "--json"])
 
     assert rc == 2
+
+
+# --- malformed payloads surface as exit 2 through a verb ----------------------
+
+
+def test_post_list_malformed_json_body_exits_two(capsys: pytest.CaptureFixture[str]) -> None:
+    """An HTML error page where JSON was expected is an env error, not a crash."""
+    factory, opener = make_opener_factory([(200, b"<html>maintenance</html>")] * 4)
+    http.set_opener_factory(factory)
+
+    rc = run(["post", "list", "--publication", "example.substack.com", "--json"])
+
+    assert rc == 2
+    assert len(opener.requests) == 1
+    err = capsys.readouterr().err
+    assert "response was not valid JSON" in err
+
+
+def test_post_get_undecodable_body_exits_two(capsys: pytest.CaptureFixture[str]) -> None:
+    factory, _opener = make_opener_factory([(200, b"\xff\xfe\x00bad")] * 4)
+    http.set_opener_factory(factory)
+
+    rc = run(["post", "get", "hello", "--publication", "example.substack.com"])
+
+    assert rc == 2
+    assert "response was not valid JSON" in capsys.readouterr().err

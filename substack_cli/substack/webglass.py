@@ -19,15 +19,28 @@ Exit-code mapping (see ``substack_cli.cli._errors``):
   since fixing it means running webglass session setup again, not retrying
   with different arguments.
 
+Every invocation runs under a finite timeout
+(:data:`DEFAULT_WEBGLASS_TIMEOUT`, 120s, overridable in seconds via
+``SUBSTACK_WEBGLASS_TIMEOUT``; a non-numeric or non-positive value is
+``CliError(EXIT_USER_ERROR)``). A timeout raises
+``CliError(EXIT_ENV_ERROR)`` naming the variable, so a wedged browser
+session can never hang an agent's command forever.
+
 The authenticated-request verb does not exist yet in webglass-cli
 (agentculture/webglass-cli#17): its name and argument shape are kept behind
 the single ``request()`` function below so that once #17 lands, only this
-function's body needs to change.
+function's body needs to change. Until then, an installed webglass asked
+for that verb answers with an argparse usage/unknown-verb error; that is
+recognised here and mapped to ``CliError(EXIT_ENV_ERROR)`` saying so
+explicitly and citing #17, rather than the generic "did not print valid
+JSON". The verbs stay registered: the gap is upstream, not in this CLI's
+surface.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess  # nosec B404 - subprocess is the whole point of this adapter
@@ -37,6 +50,37 @@ from substack_cli.cli._errors import EXIT_ENV_ERROR, EXIT_USER_ERROR, CliError
 
 _BINARY = "webglass"
 _SESSION_ENV_VAR = "SUBSTACK_WEBGLASS_SESSION"
+
+#: Seconds a single ``webglass`` invocation may take before it is killed.
+#: webglass drives a real browser, so this is far more generous than the HTTP
+#: transport's timeout -- but it is finite: an agent-facing CLI must never
+#: hang forever on a wedged subprocess.
+DEFAULT_WEBGLASS_TIMEOUT = 120.0
+
+#: Environment variable overriding :data:`DEFAULT_WEBGLASS_TIMEOUT` (seconds).
+WEBGLASS_TIMEOUT_ENV_VAR = "SUBSTACK_WEBGLASS_TIMEOUT"
+
+# webglass-cli 0.8.3 has no authenticated-request verb (issue #17). Asked for
+# one, it answers like any argparse CLI asked for an unknown subcommand: a
+# nonzero exit plus a usage/invalid-choice line on stderr. That is an
+# environment problem ("the installed webglass cannot do this yet"), not a bad
+# argument from the caller, so it maps to EXIT_ENV_ERROR with a message that
+# names the real cause instead of the generic "did not print valid JSON".
+_MISSING_REQUEST_VERB_MESSAGE = "webglass-cli does not provide an authenticated request verb yet"
+_MISSING_REQUEST_VERB_REMEDIATION = (
+    "this is tracked upstream as agentculture/webglass-cli#17; the owner/"
+    "authenticated verbs cannot run until a webglass-cli release ships that "
+    "verb -- upgrade webglass-cli once #17 lands, then retry"
+)
+
+# Markers of an argparse-style "I do not know that subcommand" answer.
+_UNKNOWN_VERB_MARKERS = (
+    "invalid choice",
+    "unrecognized argument",
+    "unknown command",
+    "unknown verb",
+    "usage:",
+)
 
 # The webglass-cli verb this adapter asks for an authenticated HTTP-shaped
 # operation. Not real yet (webglass-cli#17) - isolated here so the eventual
@@ -75,6 +119,62 @@ def session_required() -> str:
     return session_id
 
 
+def webglass_timeout() -> float:
+    """Seconds a webglass invocation may take, from the env var or the default.
+
+    Raises ``CliError(EXIT_USER_ERROR)`` for a value that is not a finite
+    positive number: a misconfigured variable is something the caller can
+    correct, so it is a user error rather than an environment failure.
+    """
+    raw = os.environ.get(WEBGLASS_TIMEOUT_ENV_VAR)
+    if raw is None or not raw.strip():
+        return DEFAULT_WEBGLASS_TIMEOUT
+    remediation = (
+        f"set ${WEBGLASS_TIMEOUT_ENV_VAR} to a positive number of seconds "
+        f"(e.g. {DEFAULT_WEBGLASS_TIMEOUT:g}), or unset it to use the default"
+    )
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise CliError(
+            EXIT_USER_ERROR,
+            f"${WEBGLASS_TIMEOUT_ENV_VAR} is not a number: {raw!r}",
+            remediation,
+        ) from exc
+    if not math.isfinite(value) or value <= 0:
+        raise CliError(
+            EXIT_USER_ERROR,
+            f"${WEBGLASS_TIMEOUT_ENV_VAR} must be a finite positive number, got {raw!r}",
+            remediation,
+        )
+    return value
+
+
+def _missing_request_verb_error() -> CliError:
+    return CliError(
+        EXIT_ENV_ERROR,
+        _MISSING_REQUEST_VERB_MESSAGE,
+        _MISSING_REQUEST_VERB_REMEDIATION,
+    )
+
+
+def _looks_like_unknown_verb(text: str) -> bool:
+    # Underscores are normalised so an error *code* like "unknown_verb"
+    # reads the same as a message saying "unknown verb".
+    lowered = (text or "").lower().replace("_", " ")
+    return any(marker in lowered for marker in _UNKNOWN_VERB_MARKERS)
+
+
+def _result_reports_unknown_verb(result: dict[str, Any]) -> bool:
+    """True when webglass's own error object says the verb is unknown."""
+    error = result.get("error")
+    if not isinstance(error, dict):
+        return False
+    message = str(error.get("message") or "")
+    code = str(error.get("code") or "")
+    return _looks_like_unknown_verb(message) or _looks_like_unknown_verb(code)
+
+
 def run_webglass(args: list[str]) -> dict[str, Any]:
     """Run ``webglass <args...> --json`` and return the parsed result dict.
 
@@ -94,6 +194,7 @@ def run_webglass(args: list[str]) -> dict[str, Any]:
             "'webglass' is on PATH, then retry",
         )
 
+    timeout = webglass_timeout()
     cmd = [_BINARY, *args, "--json"]
     try:
         completed = subprocess.run(  # nosec B603 - fixed binary name, args are ours
@@ -101,7 +202,16 @@ def run_webglass(args: list[str]) -> dict[str, Any]:
             capture_output=True,
             text=True,
             check=False,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise CliError(
+            EXIT_ENV_ERROR,
+            f"webglass timed out after {timeout:g}s: {' '.join(cmd)}",
+            f"the browser session may be wedged or awaiting input; raise "
+            f"${WEBGLASS_TIMEOUT_ENV_VAR} (seconds, default "
+            f"{DEFAULT_WEBGLASS_TIMEOUT:g}) or re-create the webglass session, then retry",
+        ) from exc
     except OSError as exc:
         raise CliError(
             EXIT_ENV_ERROR,
@@ -109,6 +219,9 @@ def run_webglass(args: list[str]) -> dict[str, Any]:
             "confirm webglass-cli is installed correctly and 'webglass' is "
             "executable on PATH, then retry",
         ) from exc
+
+    if completed.returncode != 0 and _looks_like_unknown_verb(completed.stderr or ""):
+        raise _missing_request_verb_error()
 
     stdout = completed.stdout or ""
     try:
@@ -128,6 +241,9 @@ def run_webglass(args: list[str]) -> dict[str, Any]:
             "webglass printed JSON that was not a WebOperationResult object",
             "run the same 'webglass ... --json' command manually to inspect " "its output",
         )
+
+    if _result_reports_unknown_verb(result):
+        raise _missing_request_verb_error()
 
     return result
 

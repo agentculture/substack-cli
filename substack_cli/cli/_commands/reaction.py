@@ -13,7 +13,10 @@ Endpoint facts this module is built on (see the "Reaction" section of
 * ``add``/``remove`` are authenticated and target either a post
   (``POST``/``DELETE <pub>/api/v1/post/<post_id>/reaction``) or a comment
   (``POST``/``DELETE <pub>/api/v1/comment/<comment_id>/reaction``), so both
-  verbs take a mutually exclusive ``--post``/``--comment`` id. They go
+  verbs take a mutually exclusive ``--post``/``--comment`` id. Their URLs
+  are built from :func:`substack_cli.substack.http.publication_base`, so a
+  ``SUBSTACK_API_BASE`` override applies to the writes exactly as it does
+  to the read. They go
   through :func:`substack_cli.substack.webglass.request` -- never
   ``substack_cli.substack.http`` directly -- so a missing session or a dead
   one surfaces as ``CliError(EXIT_ENV_ERROR)`` *before* any write is
@@ -59,7 +62,15 @@ _VERBS = [
 
 
 def _reaction_url(host: str, target: str, target_id: str) -> str:
-    return f"https://{host}/api/v1/{target}/{target_id}/reaction"
+    """The add/remove endpoint for one post or comment.
+
+    Built from :func:`substack_cli.substack.http.publication_base` rather
+    than a hardcoded ``https://<host>/api/v1`` so a ``SUBSTACK_API_BASE``
+    override reaches the write verbs exactly as it reaches the reads: a
+    local/staging base that only redirected ``list`` would leave add/remove
+    pointed at the real publication.
+    """
+    return f"{http.publication_base(host).rstrip('/')}/{target}/{target_id}/reaction"
 
 
 def _page_url(host: str, target_id: str) -> str:

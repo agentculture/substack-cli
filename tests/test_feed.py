@@ -311,3 +311,63 @@ def test_feed_read_anonymous_401_exits_two(
     err = json.loads(capsys.readouterr().err)
     assert err["code"] == 2
     assert "sign in" in err["message"].lower() or "log in" in err["remediation"].lower()
+
+
+# --- query encoding -----------------------------------------------------------
+
+
+def _spy_on_webglass(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
+    from substack_cli.substack import webglass as webglass_mod
+
+    captured: dict[str, list[str]] = {}
+    real_run = webglass_mod.subprocess.run
+
+    def _spy(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
+        captured["cmd"] = cmd
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(webglass_mod.subprocess, "run", _spy)
+    return captured
+
+
+def test_feed_read_percent_encodes_a_hostile_cursor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cursor with &, #, + and % must not be able to forge query params."""
+    from urllib.parse import parse_qs, urlsplit
+
+    _set_canned_response(monkeypatch, _http_result(status=200, body={"items": []}))
+    captured = _spy_on_webglass(monkeypatch)
+    cursor = "a&b=c#d+e%f"
+
+    rc = run(["feed", "read", "--limit", "5", "--cursor", cursor, "--json"])
+
+    assert rc == 0
+    url = next(part for part in captured["cmd"] if "reader/feed" in part)
+    split = urlsplit(url)
+    assert split.fragment == ""
+    assert "a&b=c" not in split.query
+    assert parse_qs(split.query, keep_blank_values=True) == {"limit": ["5"], "cursor": [cursor]}
+
+
+def test_feed_read_following_encodes_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.parse import parse_qs, urlsplit
+
+    _set_canned_response(monkeypatch, _http_result(status=200, body=[]))
+    captured = _spy_on_webglass(monkeypatch)
+
+    rc = run(["feed", "read", "--source", "following", "--limit", "3", "--json"])
+
+    assert rc == 0
+    url = next(part for part in captured["cmd"] if "feed/following" in part)
+    assert parse_qs(urlsplit(url).query) == {"limit": ["3"]}
+
+
+def test_feed_read_omits_the_cursor_param_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.parse import parse_qs, urlsplit
+
+    _set_canned_response(monkeypatch, _http_result(status=200, body={"items": []}))
+    captured = _spy_on_webglass(monkeypatch)
+
+    assert run(["feed", "read", "--json"]) == 0
+
+    url = next(part for part in captured["cmd"] if "reader/feed" in part)
+    assert parse_qs(urlsplit(url).query) == {"limit": ["20"]}

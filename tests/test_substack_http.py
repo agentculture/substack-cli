@@ -8,7 +8,9 @@ defaults afterwards.
 
 from __future__ import annotations
 
+import socket
 import subprocess
+import urllib.error
 
 import pytest
 
@@ -227,3 +229,133 @@ def test_get_does_not_retry_a_403() -> None:
     assert excinfo.value.code == 2
     assert len(opener.requests) == 1
     assert "HTTP Error 403" in excinfo.value.message
+
+
+# --- timeouts ----------------------------------------------------------------
+
+
+def test_get_passes_the_default_timeout_to_the_opener() -> None:
+    factory, opener = make_opener_factory([(200, {"ok": True})])
+    http.set_opener_factory(factory)
+
+    http.get_json("example.substack.com", "archive")
+
+    assert opener.requests[0].timeout == http.DEFAULT_HTTP_TIMEOUT
+
+
+def test_write_passes_the_default_timeout_to_the_opener() -> None:
+    factory, opener = make_opener_factory([(200, {"id": 1})])
+    http.set_opener_factory(factory)
+
+    http.request_json("example.substack.com", "posts", method="POST", data={"a": 1})
+
+    assert opener.requests[0].timeout == http.DEFAULT_HTTP_TIMEOUT
+
+
+def test_http_timeout_is_overridable_by_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SUBSTACK_HTTP_TIMEOUT", "2.5")
+    factory, opener = make_opener_factory([(200, {"ok": True})])
+    http.set_opener_factory(factory)
+
+    http.get_json("example.substack.com", "archive")
+
+    assert opener.requests[0].timeout == 2.5
+
+
+@pytest.mark.parametrize("raw", ["abc", "0", "-1", "nan", "inf"])
+def test_invalid_http_timeout_is_a_user_error(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
+    monkeypatch.setenv("SUBSTACK_HTTP_TIMEOUT", raw)
+    factory, _opener = make_opener_factory([(200, {"ok": True})])
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.get_json("example.substack.com", "archive")
+
+    assert excinfo.value.code == 1
+    assert "SUBSTACK_HTTP_TIMEOUT" in excinfo.value.message
+
+
+def test_get_retries_a_socket_timeout_then_succeeds() -> None:
+    factory, opener = make_opener_factory(
+        [(0, socket.timeout("timed out")), (200, {"hello": "world"})]
+    )
+    http.set_opener_factory(factory)
+
+    assert http.get_json("example.substack.com", "archive") == {"hello": "world"}
+    assert len(opener.requests) == 2
+
+
+def test_get_retries_a_urlerror_wrapped_timeout_until_backoff_is_exhausted() -> None:
+    wrapped = urllib.error.URLError(socket.timeout("timed out"))
+    factory, opener = make_opener_factory([(0, wrapped)] * 4)
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.get_json("example.substack.com", "archive")
+
+    assert excinfo.value.code == 2
+    assert len(opener.requests) == 4
+
+
+def test_write_timeout_is_a_single_env_error() -> None:
+    factory, opener = make_opener_factory([(0, TimeoutError("timed out"))] * 2)
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.request_json("example.substack.com", "posts", method="POST", data={"a": 1})
+
+    assert excinfo.value.code == 2
+    assert len(opener.requests) == 1
+    assert "SUBSTACK_HTTP_TIMEOUT" in excinfo.value.remediation
+
+
+# --- malformed response payloads ---------------------------------------------
+
+
+def test_get_malformed_json_is_env_error_and_is_not_retried() -> None:
+    factory, opener = make_opener_factory([(200, b"<html>not json</html>")] * 4)
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.get_json("example.substack.com", "archive")
+
+    assert excinfo.value.code == 2
+    assert "response was not valid JSON" in excinfo.value.message
+    assert "https://example.substack.com/api/v1/archive" in excinfo.value.message
+    assert len(opener.requests) == 1
+
+
+def test_get_undecodable_bytes_is_env_error() -> None:
+    factory, opener = make_opener_factory([(200, b"\xff\xfe\x00bad")] * 4)
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.get_json("example.substack.com", "archive")
+
+    assert excinfo.value.code == 2
+    assert "response was not valid JSON" in excinfo.value.message
+    assert len(opener.requests) == 1
+
+
+def test_write_malformed_json_is_env_error() -> None:
+    factory, opener = make_opener_factory([(200, b"nope")])
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.request_json("example.substack.com", "posts", method="POST", data={"a": 1})
+
+    assert excinfo.value.code == 2
+    assert "response was not valid JSON" in excinfo.value.message
+    assert "https://example.substack.com/api/v1/posts" in excinfo.value.message
+    assert len(opener.requests) == 1
+
+
+def test_write_undecodable_bytes_is_env_error() -> None:
+    factory, _opener = make_opener_factory([(200, b"\xff\xfe\x00bad")])
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.request_json("example.substack.com", "posts", method="POST", data={"a": 1})
+
+    assert excinfo.value.code == 2
+    assert "response was not valid JSON" in excinfo.value.message

@@ -20,8 +20,11 @@ Canned response selection (checked in this order):
   4. Fallback: a minimal "succeeded" WebOperationResult.
 
 The fake also honors ``WEBGLASS_FAKE_EXIT`` (an integer exit code to return)
-so tests can simulate a nonzero exit alongside the JSON body, and
-``WEBGLASS_FAKE_STDERR`` to also write a line to stderr.
+so tests can simulate a nonzero exit alongside the JSON body,
+``WEBGLASS_FAKE_STDERR`` to also write a line to stderr, and
+``WEBGLASS_FAKE_SLEEP`` (seconds, float) to stall *before* printing anything
+so the adapter's subprocess timeout can be exercised. All three are optional
+and default to "off", so every existing caller is unaffected.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 DEFAULT_RESULT = {
     "schema_version": 1,
@@ -93,6 +97,10 @@ def _response_by_url(argv: list[str]) -> str | None:
 
 
 def main() -> int:
+    stall = float(os.environ.get("WEBGLASS_FAKE_SLEEP", "0") or "0")
+    if stall > 0:
+        time.sleep(stall)
+
     sequence_dir = os.environ.get("WEBGLASS_FAKE_SEQUENCE_DIR")
     response_by_url = _response_by_url(sys.argv[1:])
     response_file = os.environ.get("WEBGLASS_FAKE_RESPONSE_FILE")

@@ -286,3 +286,138 @@ def test_webglass_module_does_not_import_playwright() -> None:
     assert "playwright" not in sys.modules
     src = (Path(webglass.__file__)).read_text(encoding="utf-8")
     assert "import playwright" not in src.lower()
+
+
+# --- subprocess timeout ------------------------------------------------------
+
+
+def test_run_webglass_passes_the_default_timeout_to_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    _set_canned_response(monkeypatch, _succeeded_result())
+    captured: dict[str, object] = {}
+    real_run = webglass.subprocess.run
+
+    def _spy(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
+        captured["timeout"] = kwargs.get("timeout")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(webglass.subprocess, "run", _spy)
+
+    webglass.run_webglass(["noop"])
+
+    assert captured["timeout"] == webglass.DEFAULT_WEBGLASS_TIMEOUT
+
+
+def test_webglass_timeout_is_overridable_by_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    _set_canned_response(monkeypatch, _succeeded_result())
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_TIMEOUT", "7.5")
+    captured: dict[str, object] = {}
+    real_run = webglass.subprocess.run
+
+    def _spy(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
+        captured["timeout"] = kwargs.get("timeout")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(webglass.subprocess, "run", _spy)
+
+    webglass.run_webglass(["noop"])
+
+    assert captured["timeout"] == 7.5
+
+
+@pytest.mark.parametrize("raw", ["abc", "0", "-3", "inf"])
+def test_invalid_webglass_timeout_is_a_user_error(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_TIMEOUT", raw)
+
+    with pytest.raises(CliError) as excinfo:
+        webglass.run_webglass(["noop"])
+
+    assert excinfo.value.code == EXIT_USER_ERROR
+    assert "SUBSTACK_WEBGLASS_TIMEOUT" in excinfo.value.message
+
+
+def test_a_hung_webglass_times_out_as_an_env_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The fake stalls for longer than the (tiny) configured timeout."""
+    _prepend_fake_webglass_to_path(monkeypatch)
+    _set_canned_response(monkeypatch, _succeeded_result())
+    monkeypatch.setenv("WEBGLASS_FAKE_SLEEP", "5")
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_TIMEOUT", "0.2")
+
+    with pytest.raises(CliError) as excinfo:
+        webglass.run_webglass(["noop"])
+
+    assert excinfo.value.code == EXIT_ENV_ERROR
+    assert "timed out" in excinfo.value.message
+    assert "SUBSTACK_WEBGLASS_TIMEOUT" in excinfo.value.remediation
+
+
+# --- webglass-cli#17: the `request` verb does not exist yet -------------------
+
+
+def test_argparse_style_unknown_verb_maps_to_the_missing_request_verb_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("WEBGLASS_FAKE_RESPONSE", "")
+    monkeypatch.setenv("WEBGLASS_FAKE_EXIT", "1")
+    monkeypatch.setenv(
+        "WEBGLASS_FAKE_STDERR",
+        "usage: webglass [-h] {session,navigate} ...\n"
+        "webglass: error: argument command: invalid choice: 'request'",
+    )
+
+    with pytest.raises(CliError) as excinfo:
+        webglass.run_webglass(["request", "--method", "GET", "--url", "https://example.com"])
+
+    assert excinfo.value.code == EXIT_ENV_ERROR
+    assert "does not provide an authenticated request verb yet" in excinfo.value.message
+    assert "webglass-cli#17" in excinfo.value.remediation
+
+
+def test_result_reporting_an_unknown_verb_maps_to_the_missing_request_verb_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    _set_canned_response(
+        monkeypatch,
+        {
+            "schema_version": 1,
+            "operation_id": "operation-test",
+            "kind": "request",
+            "lifecycle_state": "failed",
+            "content": {"trusted": {}, "untrusted": {}, "sensitive": {}, "derived": {}},
+            "error": {"code": "unknown_verb", "message": "unknown verb 'request'"},
+        },
+    )
+
+    with pytest.raises(CliError) as excinfo:
+        webglass.run_webglass(["request"])
+
+    assert excinfo.value.code == EXIT_ENV_ERROR
+    assert "does not provide an authenticated request verb yet" in excinfo.value.message
+    assert "webglass-cli#17" in excinfo.value.remediation
+
+
+def test_request_verb_is_still_registered_in_the_adapter() -> None:
+    """#17 is a missing upstream verb, not a reason to drop substack-cli's verbs."""
+    assert webglass._REQUEST_VERB == "request"
+    assert callable(webglass.request)
+
+
+def test_a_plain_non_json_stdout_without_usage_text_is_still_the_generic_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("WEBGLASS_FAKE_RESPONSE", "not json at all")
+
+    with pytest.raises(CliError) as excinfo:
+        webglass.run_webglass(["noop"])
+
+    assert excinfo.value.code == EXIT_ENV_ERROR
+    assert "did not print valid JSON" in excinfo.value.message

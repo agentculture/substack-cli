@@ -42,6 +42,7 @@ class RecordedRequest:
     method: str
     url: str
     headers: dict[str, str] = field(default_factory=dict)
+    timeout: Any = None
 
 
 class FakeOpener:
@@ -49,7 +50,9 @@ class FakeOpener:
 
     A status >= 400 raises :class:`urllib.error.HTTPError`, matching the
     real ``urllib`` opener's behaviour, so production error-handling code
-    is exercised unchanged.
+    is exercised unchanged. A queued payload that *is* an exception
+    instance is raised instead of returned, so transport-level failures (a
+    socket timeout, a bare ``URLError``) can be replayed too.
     """
 
     def __init__(self, responses: Iterable[tuple[int, Any]]) -> None:
@@ -59,11 +62,15 @@ class FakeOpener:
     def open(self, req: Any, timeout: float | None = None) -> FakeHTTPResponse:
         headers = {key: value for key, value in req.header_items()}
         self.requests.append(
-            RecordedRequest(method=req.get_method(), url=req.full_url, headers=headers)
+            RecordedRequest(
+                method=req.get_method(), url=req.full_url, headers=headers, timeout=timeout
+            )
         )
         if not self._responses:
             raise AssertionError("FakeOpener: no more queued responses")
         status, payload = self._responses.pop(0)
+        if isinstance(payload, BaseException):
+            raise payload
         body = payload if isinstance(payload, bytes) else _json.dumps(payload).encode("utf-8")
         if status >= 400:
             raise urllib.error.HTTPError(
