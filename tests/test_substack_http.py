@@ -202,3 +202,28 @@ def test_account_request_json_write_no_retry() -> None:
 
     assert exc_info.value.code == 2
     assert len(opener.requests) == 1
+
+
+def test_requests_carry_a_descriptive_user_agent() -> None:
+    """Substack 403s urllib's default agent; we send substack-cli/<version>."""
+    factory, opener = make_opener_factory([(200, [])])
+    http.set_opener_factory(factory)
+
+    http.get_json("example.substack.com", "archive")
+
+    ua = opener.requests[0].headers.get("User-agent")
+    assert ua is not None and ua.startswith("substack-cli/")
+    assert "Python-urllib" not in ua
+
+
+def test_get_does_not_retry_a_403() -> None:
+    """4xx other than 429 is a definitive answer: exactly one attempt, exit 2."""
+    factory, opener = make_opener_factory([(403, "Forbidden")] * 4)
+    http.set_opener_factory(factory)
+
+    with pytest.raises(CliError) as excinfo:
+        http.get_json("example.substack.com", "archive")
+
+    assert excinfo.value.code == 2
+    assert len(opener.requests) == 1
+    assert "HTTP Error 403" in excinfo.value.message

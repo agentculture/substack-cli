@@ -36,6 +36,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Optional
 
+from substack_cli import __version__
 from substack_cli.cli._errors import CliError
 
 #: Account-level endpoints always resolve against this host.
@@ -50,6 +51,11 @@ PUBLIC_BASE = "https://{host}/api/v1"
 # reject obviously-wrong input like "not a host" without pretending to be
 # a full RFC 1035 validator.
 _HOST_RE = re.compile(r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$")
+
+#: Sent on every request. Substack answers 403 to urllib's default
+#: ``Python-urllib/x.y`` agent but accepts a descriptive one (verified with curl
+#: on 2026-09-13); we identify honestly rather than imitate a browser.
+USER_AGENT = f"substack-cli/{__version__} (+https://github.com/agentculture/substack-cli)"
 
 #: Seconds to sleep before each GET retry (3 retries -> up to 4 attempts).
 _RETRY_DELAYS: tuple[float, ...] = (0.5, 1, 2)
@@ -134,7 +140,7 @@ def _join(base: str, path: str) -> str:
 
 
 def _build_request(url: str, method: str, data: Optional[dict[str, Any]]) -> urllib.request.Request:
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     body: Optional[bytes] = None
     if data is not None:
         body = json.dumps(data).encode("utf-8")
@@ -157,6 +163,17 @@ def _send_once(url: str, method: str, data: Optional[dict[str, Any]]) -> dict[st
     return json.loads(payload.decode("utf-8")) if payload else {}
 
 
+def _is_retryable(exc: Exception) -> bool:
+    """Only 429, 5xx and transport-level failures are worth another GET.
+
+    A 401/403/404 is a definitive answer from the server; retrying it three
+    more times just delays the error the caller needs.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code == 429 or exc.code >= 500
+    return True
+
+
 def _get_with_backoff(url: str) -> dict[str, Any]:
     opener = _opener_factory()
     last_exc: Optional[Exception] = None
@@ -171,6 +188,8 @@ def _get_with_backoff(url: str) -> dict[str, Any]:
             return json.loads(payload.decode("utf-8")) if payload else {}
         except (urllib.error.HTTPError, urllib.error.URLError) as exc:
             last_exc = exc
+            if not _is_retryable(exc):
+                break
             try:
                 delay = next(delays)
             except StopIteration:

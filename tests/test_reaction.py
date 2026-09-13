@@ -241,7 +241,7 @@ def test_reaction_list_unknown_post_exits_one(capsys: pytest.CaptureFixture[str]
     )
 
     assert rc == 1
-    assert len(opener.requests) == 4
+    assert len(opener.requests) == 1  # 4xx fails fast, no retry
     err = json.loads(capsys.readouterr().err)
     assert err["code"] == 1
     assert "nope" in err["message"]
