@@ -71,7 +71,7 @@ Post and comment bodies are ProseMirror documents serialized as a JSON
 
 | Verb | Method and path | Request body | Auth | Capture |
 |------|-----------------|--------------|------|---------|
-| list | `GET <pub>/api/v1/post/<post_id>/comments` (UI adds `?token=&all_comments=true&sort=best_first`) | — | none | public post page |
+| list | `GET <pub>/api/v1/post/<post_id>/comments` (the UI adds the query params `all_comments=true` and `sort=best_first`, plus an empty pagination cursor) | — | none | public post page |
 | create | `POST <pub>/api/v1/post/<post_id>/comment` | `{"body": "<text>"}` | session | comment box, "Post" |
 | reply | `POST <pub>/api/v1/post/<post_id>/comment` | `{"body": "<text>", "parent_id": <comment_id>}` | session | "Reply" under a comment |
 | delete | `DELETE <pub>/api/v1/comment/<comment_id>` | — → `{}` | session | in-page fetch (reply and top-level) |

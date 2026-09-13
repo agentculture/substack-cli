@@ -4,7 +4,7 @@
   "schema_version": 6,
   "status": "exported",
   "created": "2026-09-12T18:40:14Z",
-  "updated": "2026-09-12T21:12:36Z",
+  "updated": "2026-09-13T02:01:25Z",
   "claims": [
     {
       "id": "c1",
@@ -1187,6 +1187,83 @@
       ],
       "origin": "llm",
       "status": "approved"
+    },
+    {
+      "id": "l2",
+      "code": "assumption-for-measurement",
+      "what": "t1 agent redirected stderr into the evidence file (2>&1) and inferred stderr was empty from the file parsing as clean JSON rather than checking the stream separately",
+      "skipped_check": "capture stdout only, or assert stderr empty before merging streams",
+      "refs": [
+        "t1 baseline-learn.txt"
+      ],
+      "origin": "llm",
+      "status": "proposed"
+    },
+    {
+      "id": "l3",
+      "code": "control-absent",
+      "what": "t4 agent implemented multi-line body handling in render.py but added no test for a multi-line hostile body, so that path is unverified",
+      "skipped_check": "a multi-line hostile-body test in tests/test_render.py",
+      "refs": [
+        "t4 render.py"
+      ],
+      "origin": "llm",
+      "status": "proposed"
+    },
+    {
+      "id": "l4",
+      "code": "assumption-for-measurement",
+      "what": "t2 agent read 'backoff = 3 attempts, 0.5/1/2s' as 3 retries after the first try (4 GET attempts) because that reading uses all three delays; the plan text is ambiguous and the agent chose an interpretation rather than asking",
+      "skipped_check": "confirm attempt count with the plan author",
+      "refs": [
+        "t2 http.py backoff"
+      ],
+      "origin": "llm",
+      "status": "proposed"
+    },
+    {
+      "id": "l5",
+      "code": "provenance-missing",
+      "what": "t2 agent added get_account_json/request_json/account_request_json beyond the literally named get_json to cover the write path; scope inferred from the acceptance criteria rather than stated",
+      "skipped_check": "",
+      "refs": [
+        "t2 http.py public API"
+      ],
+      "origin": "llm",
+      "status": "proposed"
+    },
+    {
+      "id": "l6",
+      "code": "assumption-for-measurement",
+      "what": "t3 agent invented the HTTP response shape (content.trusted.response = {status, body, headers}) that map_failure keys off, since webglass-cli#17's request verb does not exist yet; unverified against any real webglass output",
+      "skipped_check": "verify against webglass-cli#17's shipped verb",
+      "refs": [
+        "t3 webglass.py map_failure"
+      ],
+      "origin": "llm",
+      "status": "proposed"
+    },
+    {
+      "id": "l7",
+      "code": "control-absent",
+      "what": "t6 remaps 404->exit 1 by regex-parsing the 'HTTP Error <code>' text inside http.get_json's CliError message because the error carries no structured status; a message-format change in http.py silently breaks the remap",
+      "skipped_check": "a structured status attribute on the CliError raised by http.py",
+      "refs": [
+        "t6 post.py get; http.py _get_with_backoff"
+      ],
+      "origin": "llm",
+      "status": "proposed"
+    },
+    {
+      "id": "l8",
+      "code": "grader-unverified",
+      "what": "t5's webglass version probe shells out to 'webglass --version' but the fake executable ignores argv, so the probe is only tested for presence/absence, never against the real binary's output",
+      "skipped_check": "a test asserting the parsed version string against a fake that honours --version",
+      "refs": [
+        "t5 account.py _webglass_version"
+      ],
+      "origin": "llm",
+      "status": "proposed"
     }
   ],
   "obligations": []
