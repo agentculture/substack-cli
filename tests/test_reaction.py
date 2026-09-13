@@ -611,3 +611,46 @@ def test_reaction_add_bad_publication_host_exits_one_before_subprocess(
     assert rc == 1
     err = json.loads(capsys.readouterr().err)
     assert err["code"] == 1
+
+
+# --- SUBSTACK_API_BASE applies to writes exactly as it does to reads ----------
+
+
+def _spy_on_webglass(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
+    captured: dict[str, list[str]] = {}
+    real_run = webglass.subprocess.run
+
+    def _spy(cmd, *args, **kwargs):  # type: ignore[no-untyped-def]
+        captured["cmd"] = cmd
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(webglass.subprocess, "run", _spy)
+    return captured
+
+
+def test_reaction_add_url_honours_substack_api_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
+    monkeypatch.setenv("SUBSTACK_API_BASE", "http://127.0.0.1:9999/{host}/v9")
+    _set_canned_response(monkeypatch, _http_result(status=200, body="{}"))
+    captured = _spy_on_webglass(monkeypatch)
+
+    rc = run(["reaction", "add", "--publication", "example.substack.com", "--post", "42", "--json"])
+
+    assert rc == 0
+    assert "http://127.0.0.1:9999/example.substack.com/v9/post/42/reaction" in captured["cmd"]
+
+
+def test_reaction_remove_url_honours_substack_api_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    _prepend_fake_webglass_to_path(monkeypatch)
+    monkeypatch.setenv("SUBSTACK_WEBGLASS_SESSION", "session-abc")
+    monkeypatch.setenv("SUBSTACK_API_BASE", "http://127.0.0.1:9999/{host}/v9")
+    _set_canned_response(monkeypatch, _http_result(status=200, body="{}"))
+    captured = _spy_on_webglass(monkeypatch)
+
+    rc = run(
+        ["reaction", "remove", "--publication", "example.substack.com", "--comment", "99", "--json"]
+    )
+
+    assert rc == 0
+    assert "http://127.0.0.1:9999/example.substack.com/v9/comment/99/reaction" in captured["cmd"]

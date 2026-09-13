@@ -500,3 +500,76 @@ def test_comment_delete_never_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     run(["comment", "delete", "--publication", "example.substack.com", "99", "--json"])
 
     assert calls["count"] == 1
+
+
+# --- list: observed query params and threaded replies -------------------------
+
+
+def test_comment_list_sends_the_observed_query_params() -> None:
+    factory, opener = make_opener_factory([(200, {"comments": []})])
+    http.set_opener_factory(factory)
+
+    assert run(["comment", "list", "--publication", "example.substack.com", "--post", "42"]) == 0
+
+    url = opener.requests[0].url
+    assert url.startswith("https://example.substack.com/api/v1/post/42/comments?")
+    assert "all_comments=true" in url
+    assert "sort=best_first" in url
+
+
+def test_comment_list_flattens_children_depth_first(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Parents come before their replies, and a reply's replies before the next parent."""
+    thread = [
+        {
+            "id": 1,
+            "name": "A",
+            "body": "root one",
+            "ancestor_path": "",
+            "children": [
+                {
+                    "id": 2,
+                    "name": "B",
+                    "body": "reply to one",
+                    "parent_id": 1,
+                    "ancestor_path": "1",
+                    "children": [
+                        {
+                            "id": 3,
+                            "name": "C",
+                            "body": "reply to two",
+                            "parent_id": 2,
+                            "ancestor_path": "1.2",
+                        }
+                    ],
+                }
+            ],
+        },
+        {"id": 4, "name": "D", "body": "root two", "ancestor_path": ""},
+    ]
+    factory, _opener = make_opener_factory([(200, {"comments": thread})])
+    http.set_opener_factory(factory)
+
+    rc = run(["comment", "list", "--publication", "example.substack.com", "--post", "42", "--json"])
+
+    assert rc == 0
+    items = json.loads(capsys.readouterr().out)
+    assert [item["id"] for item in items] == [1, 2, 3, 4]
+    assert items[1]["parent_id"] == 1
+    assert items[2]["ancestor_path"] == "1.2"
+    assert "children" not in items[0]
+    assert items[0]["content"] == "root one"
+
+
+def test_comment_list_ignores_a_non_list_children_value(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    thread = [{"id": 1, "name": "A", "body": "root", "children": "not-a-list"}]
+    factory, _opener = make_opener_factory([(200, {"comments": thread})])
+    http.set_opener_factory(factory)
+
+    rc = run(["comment", "list", "--publication", "example.substack.com", "--post", "42", "--json"])
+
+    assert rc == 0
+    assert [item["id"] for item in json.loads(capsys.readouterr().out)] == [1]

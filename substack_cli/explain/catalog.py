@@ -282,7 +282,10 @@ overview` describes the verb surface.
 _COMMENT_LIST = """\
 # substack-cli comment list
 
-Lists a post's comments. Public — no session required.
+Lists a post's comments, replies included: the whole thread is requested
+(`all_comments=true&sort=best_first`) and the nested replies are flattened
+depth-first, each parent immediately followed by its own replies (`parent_id`
+and `ancestor_path` are kept on every item). Public — no session required.
 
 ## Usage
 

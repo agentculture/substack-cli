@@ -1,7 +1,9 @@
 """``substack-cli comment`` — read a post's comments; reply/delete as owner.
 
 Read side: ``list`` walks a post's comment thread
-(``GET <pub>/api/v1/post/<post_id>/comments``), public, no session required.
+(``GET <pub>/api/v1/post/<post_id>/comments?all_comments=true&sort=best_first``
+-- the query the public post page itself sends), public, no session required,
+flattening the nested ``children`` replies depth-first into a single list.
 It hits :func:`substack_cli.substack.http.get_json`, exactly like
 :mod:`substack_cli.cli._commands.post`'s read verbs, and maps the raw
 comment JSON shape into :mod:`substack_cli.substack.render`'s untrusted-text
@@ -29,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 from typing import Any
+from urllib.parse import urlencode
 
 from substack_cli.cli._commands.overview import emit_overview
 from substack_cli.cli._output import emit_result
@@ -46,14 +49,25 @@ _VERBS = [
     "comment overview — this descriptive snapshot",
 ]
 
+#: Query params the publication page was observed to send on the comments
+#: endpoint. ``all_comments=true`` is what makes the endpoint return the whole
+#: thread rather than a truncated head.
+_LIST_QUERY = (("all_comments", "true"), ("sort", "best_first"))
+
+#: Recursion cap for flattening the (third-party) comment tree.
+_MAX_THREAD_DEPTH = 64
+
 
 def _to_render_item(raw: dict[str, Any]) -> dict[str, Any]:
     """Map a raw Substack comment object into render.py's untrusted-item shape.
 
     ``body`` is author-supplied (third-party) text, so it is the sole
     ``content`` field render_items treats as untrusted. Trusted metadata
-    (id/author/date) plus a couple of informative extras (post_id,
-    ancestor_path) ride alongside for --json consumers.
+    (id/author/date) plus the threading extras (post_id, parent_id,
+    ancestor_path) ride alongside for --json consumers -- once the tree is
+    flattened, those keys are the only thing left saying which comment a
+    reply hangs off. The raw ``children`` list is *not* carried over: it is
+    the tree that ``_flatten_comments`` has already unrolled.
     """
     item: dict[str, Any] = {
         "id": raw.get("id"),
@@ -61,17 +75,57 @@ def _to_render_item(raw: dict[str, Any]) -> dict[str, Any]:
         "date": raw.get("date"),
         "content": raw.get("body") or "",
     }
-    for extra_key in ("post_id", "ancestor_path"):
+    for extra_key in ("post_id", "parent_id", "ancestor_path"):
         if raw.get(extra_key) is not None:
             item[extra_key] = raw[extra_key]
     return item
 
 
+def _flatten_comments(comments: Any, depth: int = 0) -> list[dict[str, Any]]:
+    """Depth-first flatten of a comment tree: every parent before its replies.
+
+    Substack nests replies under each comment's ``children`` list (to
+    arbitrary depth), so a listing that only walked the top level would
+    silently drop every reply. Order is depth-first -- a comment, then its
+    whole subtree, then the next sibling -- which is the order a reader sees
+    the thread on the page.
+
+    Non-dict entries and non-list ``children`` values are skipped rather
+    than trusted: this is third-party data. ``_MAX_THREAD_DEPTH`` caps the
+    recursion so a malformed (or maliciously self-nested) payload cannot
+    blow the stack.
+    """
+    flattened: list[dict[str, Any]] = []
+    if depth >= _MAX_THREAD_DEPTH or not isinstance(comments, list):
+        return flattened
+    for comment in comments:
+        if not isinstance(comment, dict):
+            continue
+        flattened.append(comment)
+        flattened.extend(_flatten_comments(comment.get("children"), depth + 1))
+    return flattened
+
+
 def cmd_comment_list(args: argparse.Namespace) -> int:
+    """List every comment on a post, replies included.
+
+    Requests ``GET <pub>/api/v1/post/<post_id>/comments?all_comments=true&
+    sort=best_first`` -- the query the publication's own page was observed to
+    send (it also passes an empty pagination cursor, which is omitted here
+    since it selects the first page either way). Without ``all_comments`` the
+    endpoint returns a truncated thread, so the params are part of the
+    contract, not decoration.
+
+    The response nests replies under each comment's ``children``; they are
+    flattened depth-first into one list (parents before replies) with
+    ``parent_id``/``ancestor_path`` preserved on each item.
+    """
     json_mode = bool(getattr(args, "json", False))
-    raw = http.get_json(args.publication, f"post/{args.post}/comments")
+    query = urlencode(_LIST_QUERY)
+    raw = http.get_json(args.publication, f"post/{args.post}/comments?{query}")
     comments = raw.get("comments", []) if isinstance(raw, dict) else []
-    render_items([_to_render_item(item) for item in comments], json_mode=json_mode)
+    items = [_to_render_item(item) for item in _flatten_comments(comments)]
+    render_items(items, json_mode=json_mode)
     return 0
 
 
@@ -145,6 +199,8 @@ def _comment_sections() -> list[dict[str, object]]:
             "title": "Notes",
             "items": [
                 "list is public, no session/cookie required",
+                "list asks for the whole thread (all_comments=true&sort=best_first)"
+                " and flattens nested replies depth-first, parents first",
                 "reply and delete are owner verbs: routed through webglass, never retried",
                 "comment bodies (author-supplied text) are rendered only under 'content'",
                 "reply/delete --json results carry 'id' and a best-effort 'url'"

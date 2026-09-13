@@ -659,3 +659,74 @@ def test_write_verbs_never_retry_a_failed_call(
 
     assert rc == 2
     assert len(fake.calls) == 1
+
+
+# --- publish: --body-json must be a ProseMirror document ---------------------
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        pytest.param("null", id="null"),
+        pytest.param('[{"type": "paragraph"}]', id="list"),
+        pytest.param('"just a string"', id="string-scalar"),
+        pytest.param("42", id="number-scalar"),
+        pytest.param("{}", id="empty-object"),
+        pytest.param(
+            '{"type": "paragraph", "content": []}',
+            id="bare-paragraph-node",
+        ),
+        pytest.param('{"type": "doc"}', id="doc-without-content"),
+        pytest.param('{"type": "doc", "content": {}}', id="doc-with-object-content"),
+    ],
+)
+def test_publish_body_json_that_is_not_a_prosemirror_doc_exits_one(
+    fake: Fake, tmp_path: Path, capsys: pytest.CaptureFixture[str], raw: str
+) -> None:
+    """Only a top-level {"type": "doc", "content": [...]} is accepted."""
+    body_file = tmp_path / "body.json"
+    body_file.write_text(raw, encoding="utf-8")
+
+    rc = run(
+        [
+            "post",
+            "publish",
+            "--publication",
+            HOST,
+            "--body-json",
+            str(body_file),
+            "--title",
+            "Hello",
+            "--json",
+        ]
+    )
+
+    assert rc == 1
+    err = json.loads(capsys.readouterr().err)
+    assert err["code"] == 1
+    assert '"type": "doc"' in err["remediation"]
+    assert fake.calls == []
+
+
+def test_publish_accepts_a_doc_with_content_nodes(fake: Fake, tmp_path: Path) -> None:
+    queue(fake, SUBSCRIPTION, DRAFT_CREATED)
+    doc = {"type": "doc", "content": [{"type": "paragraph", "content": []}]}
+    body_file = tmp_path / "body.json"
+    body_file.write_text(json.dumps(doc), encoding="utf-8")
+
+    rc = run(
+        [
+            "post",
+            "publish",
+            "--publication",
+            HOST,
+            "--body-json",
+            str(body_file),
+            "--title",
+            "Hello",
+            "--json",
+        ]
+    )
+
+    assert rc == 0
+    assert json.loads(fake.call(1)["body"]["draft_body"]) == doc

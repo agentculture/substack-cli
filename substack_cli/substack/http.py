@@ -20,6 +20,13 @@ total. Writes (anything that is not a GET) never retry -- a single failure
 raises :class:`~substack_cli.cli._errors.CliError` immediately, since
 replaying a non-idempotent write on a flaky response is unsafe.
 
+Every request carries a finite timeout (:data:`DEFAULT_HTTP_TIMEOUT`, 30s,
+overridable in seconds via ``SUBSTACK_HTTP_TIMEOUT``; a non-numeric or
+non-positive value is ``CliError(1)``). A timed-out GET is a retryable
+transport failure like any other; a timed-out write raises ``CliError(2)``
+immediately. A response body that is not valid UTF-8 JSON is never retried
+either -- it raises ``CliError(2)`` naming the URL.
+
 The urllib opener is never constructed directly by request code -- it is
 always obtained through the module-level :func:`_opener_factory`, which
 tests overwrite via :func:`set_opener_factory` so nothing here ever touches
@@ -29,8 +36,10 @@ the network in the test suite.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -59,6 +68,20 @@ USER_AGENT = f"substack-cli/{__version__} (+https://github.com/agentculture/subs
 
 #: Seconds to sleep before each GET retry (3 retries -> up to 4 attempts).
 _RETRY_DELAYS: tuple[float, ...] = (0.5, 1, 2)
+
+#: Seconds any single request may take before it is abandoned. A request
+#: without a timeout can hang forever (urllib's default is the global socket
+#: timeout, normally ``None``), which for an agent-facing CLI means a command
+#: that never returns and never reports an error.
+DEFAULT_HTTP_TIMEOUT = 30.0
+
+#: Environment variable overriding :data:`DEFAULT_HTTP_TIMEOUT` (seconds).
+HTTP_TIMEOUT_ENV_VAR = "SUBSTACK_HTTP_TIMEOUT"
+
+#: Transport-level timeouts that are not ``URLError`` subclasses.
+#: ``socket.timeout`` is an alias of ``TimeoutError`` on Python 3.10+, but
+#: both are named so the intent survives if that ever changes.
+_TIMEOUT_EXCEPTIONS: tuple[type[BaseException], ...] = (socket.timeout, TimeoutError)
 
 _opener_factory: Callable[[], "urllib.request.OpenerDirector"] = urllib.request.build_opener
 _sleep: Callable[[float], None] = time.sleep
@@ -139,6 +162,74 @@ def _join(base: str, path: str) -> str:
     return base.rstrip("/") + "/" + path.lstrip("/")
 
 
+def request_timeout() -> float:
+    """Seconds any single request may take, from the env var or the default.
+
+    Raises ``CliError(1)`` for a value that is not a finite positive number:
+    that is a misconfigured environment the caller can fix by correcting the
+    variable, so it is a user error, not an environment failure.
+    """
+    raw = os.environ.get(HTTP_TIMEOUT_ENV_VAR)
+    if raw is None or not raw.strip():
+        return DEFAULT_HTTP_TIMEOUT
+    remediation = (
+        f"set ${HTTP_TIMEOUT_ENV_VAR} to a positive number of seconds "
+        f"(e.g. {DEFAULT_HTTP_TIMEOUT:g}), or unset it to use the default"
+    )
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise CliError(
+            code=1,
+            message=f"${HTTP_TIMEOUT_ENV_VAR} is not a number: {raw!r}",
+            remediation=remediation,
+        ) from exc
+    if not math.isfinite(value) or value <= 0:
+        raise CliError(
+            code=1,
+            message=f"${HTTP_TIMEOUT_ENV_VAR} must be a finite positive number, got {raw!r}",
+            remediation=remediation,
+        )
+    return value
+
+
+def _decode(payload: bytes, method: str, url: str) -> dict[str, Any]:
+    """Decode a response body as UTF-8 JSON, or raise ``CliError(2)``.
+
+    A body that is not valid UTF-8 JSON (an HTML error/interstitial page, a
+    truncated response) is never retried: replaying the same request will
+    produce the same unusable payload, so it is reported once, naming the
+    URL, as an environment error.
+    """
+    if not payload:
+        return {}
+    try:
+        return json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CliError(
+            code=2,
+            message=f"{method} {url} response was not valid JSON: {exc}",
+            remediation="check SUBSTACK_API_BASE and whether the endpoint returned an "
+            "HTML error page instead of JSON",
+        ) from exc
+
+
+def _timeout_error(method: str, url: str, exc: Exception) -> CliError:
+    return CliError(
+        code=2,
+        message=f"{method} {url} timed out: {exc}",
+        remediation=f"check network connectivity, or raise ${HTTP_TIMEOUT_ENV_VAR} "
+        f"(seconds, default {DEFAULT_HTTP_TIMEOUT:g}) and retry",
+    )
+
+
+def _is_timeout(exc: Exception) -> bool:
+    if isinstance(exc, _TIMEOUT_EXCEPTIONS):
+        return True
+    reason = getattr(exc, "reason", None)
+    return isinstance(reason, _TIMEOUT_EXCEPTIONS)
+
+
 def _build_request(url: str, method: str, data: Optional[dict[str, Any]]) -> urllib.request.Request:
     headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     body: Optional[bytes] = None
@@ -149,18 +240,23 @@ def _build_request(url: str, method: str, data: Optional[dict[str, Any]]) -> url
 
 
 def _send_once(url: str, method: str, data: Optional[dict[str, Any]]) -> dict[str, Any]:
+    timeout = request_timeout()
     opener = _opener_factory()
     request = _build_request(url, method, data)
     try:
-        with opener.open(request) as response:
+        with opener.open(request, timeout=timeout) as response:
             payload = response.read()
-    except (urllib.error.HTTPError, urllib.error.URLError) as exc:
+    except (urllib.error.HTTPError, urllib.error.URLError, *_TIMEOUT_EXCEPTIONS) as exc:
+        if _is_timeout(exc):
+            # A write never retries, and a timed-out write is no different:
+            # the server may well have applied it, so one CliError(2) and out.
+            raise _timeout_error(method, url, exc) from exc
         raise CliError(
             code=2,
             message=f"{method} {url} failed: {exc}",
             remediation="check network connectivity, credentials, and SUBSTACK_API_BASE",
         ) from exc
-    return json.loads(payload.decode("utf-8")) if payload else {}
+    return _decode(payload, method, url)
 
 
 def _is_retryable(exc: Exception) -> bool:
@@ -175,6 +271,7 @@ def _is_retryable(exc: Exception) -> bool:
 
 
 def _get_with_backoff(url: str) -> dict[str, Any]:
+    timeout = request_timeout()
     opener = _opener_factory()
     last_exc: Optional[Exception] = None
     delays = iter(_RETRY_DELAYS)
@@ -183,10 +280,12 @@ def _get_with_backoff(url: str) -> dict[str, Any]:
         attempts += 1
         request = _build_request(url, "GET", None)
         try:
-            with opener.open(request) as response:
+            with opener.open(request, timeout=timeout) as response:
                 payload = response.read()
-            return json.loads(payload.decode("utf-8")) if payload else {}
-        except (urllib.error.HTTPError, urllib.error.URLError) as exc:
+            # Decoding failures raise CliError(2) straight out of the loop:
+            # a malformed payload is not a transport hiccup, so no retry.
+            return _decode(payload, "GET", url)
+        except (urllib.error.HTTPError, urllib.error.URLError, *_TIMEOUT_EXCEPTIONS) as exc:
             last_exc = exc
             if not _is_retryable(exc):
                 break
@@ -195,6 +294,8 @@ def _get_with_backoff(url: str) -> dict[str, Any]:
             except StopIteration:
                 break
             _sleep(delay)
+    if last_exc is not None and _is_timeout(last_exc):
+        raise _timeout_error("GET", url, last_exc)
     raise CliError(
         code=2,
         message=f"GET {url} failed after {attempts} attempts: {last_exc}",
