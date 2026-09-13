@@ -118,6 +118,19 @@ def _publication_base(host: str) -> str:
     return _api_base_template().format(host=publication_host(host))
 
 
+def publication_base(host: str) -> str:
+    """Public wrapper around :func:`_publication_base`.
+
+    Callers that build a full URL for a non-``get_json``/``request_json``
+    transport (e.g. :mod:`substack_cli.substack.webglass`'s authenticated
+    ``request()``) need the same validated ``https://<host>/api/v1`` base
+    this module already computes for its own GET/write helpers, without
+    reaching into the private ``_publication_base``. Raises ``CliError(1)``
+    for an invalid `host`, exactly like `_publication_base`.
+    """
+    return _publication_base(host)
+
+
 def _join(base: str, path: str) -> str:
     return base.rstrip("/") + "/" + path.lstrip("/")
 
