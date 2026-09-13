@@ -260,6 +260,35 @@ def _http_response(result: dict[str, Any]) -> dict[str, Any] | None:
     return response if isinstance(response, dict) else None
 
 
+def _raise_for_http_response(response: dict[str, Any]) -> None:
+    """Map an HTTP-shaped failure (status/body) onto the exit-code policy."""
+    status = response.get("status")
+    body = str(response.get("body") or "")
+
+    if status == 401 or "please sign in" in body.lower():
+        raise CliError(
+            EXIT_ENV_ERROR,
+            f"webglass request was rejected (401): {body.strip() or 'sign-in required'}",
+            "the webglass session has expired or was signed out - log in "
+            "again ('webglass session create --json') and export the new "
+            f"session id as ${_SESSION_ENV_VAR}, then retry",
+        )
+
+    if status == 404:
+        raise CliError(
+            EXIT_USER_ERROR,
+            f"webglass request returned 404: {body.strip() or 'not found'}",
+            "check the id/URL you passed and try again",
+        )
+
+    if isinstance(status, int) and status >= 400:
+        raise CliError(
+            EXIT_ENV_ERROR,
+            f"webglass request failed ({status}): {body.strip() or 'no body'}",
+            "inspect the response body above; retry once the underlying issue is resolved",
+        )
+
+
 def map_failure(result: dict[str, Any]) -> None:
     """Raise the appropriate ``CliError`` for a failed webglass result.
 
@@ -285,31 +314,7 @@ def map_failure(result: dict[str, Any]) -> None:
 
     response = _http_response(result)
     if response is not None:
-        status = response.get("status")
-        body = str(response.get("body") or "")
-
-        if status == 401 or "please sign in" in body.lower():
-            raise CliError(
-                EXIT_ENV_ERROR,
-                f"webglass request was rejected (401): {body.strip() or 'sign-in required'}",
-                "the webglass session has expired or was signed out - log in "
-                "again ('webglass session create --json') and export the new "
-                f"session id as ${_SESSION_ENV_VAR}, then retry",
-            )
-
-        if status == 404:
-            raise CliError(
-                EXIT_USER_ERROR,
-                f"webglass request returned 404: {body.strip() or 'not found'}",
-                "check the id/URL you passed and try again",
-            )
-
-        if isinstance(status, int) and status >= 400:
-            raise CliError(
-                EXIT_ENV_ERROR,
-                f"webglass request failed ({status}): {body.strip() or 'no body'}",
-                "inspect the response body above; retry once the underlying " "issue is resolved",
-            )
+        _raise_for_http_response(response)
 
     error = result.get("error")
     if isinstance(error, dict) and error.get("message"):

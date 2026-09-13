@@ -142,16 +142,16 @@ def cmd_account_whoami(args: argparse.Namespace) -> int:
     json_mode = bool(getattr(args, "json", False))
     if json_mode:
         emit_result(report, json_mode=True)
-        return 0
-    publication = report["publication"]
-    lines = [
-        f"user_id: {report['user_id']}",
-        f"publication.id: {publication.get('id')}",
-        f"publication.subdomain: {publication.get('subdomain')}",
-        f"publication.name: {publication.get('name')}",
-        f"publication.custom_domain: {publication.get('custom_domain')}",
-    ]
-    emit_result("\n".join(lines), json_mode=False)
+    else:
+        publication = report["publication"]
+        lines = [
+            f"user_id: {report['user_id']}",
+            f"publication.id: {publication.get('id')}",
+            f"publication.subdomain: {publication.get('subdomain')}",
+            f"publication.name: {publication.get('name')}",
+            f"publication.custom_domain: {publication.get('custom_domain')}",
+        ]
+        emit_result("\n".join(lines), json_mode=False)
     return 0
 
 
@@ -168,12 +168,12 @@ def cmd_account_overview(args: argparse.Namespace) -> int:
     json_mode = bool(getattr(args, "json", False))
     if json_mode:
         emit_result(report, json_mode=True)
-        return 0
-    lines = [
-        f"webglass on PATH: {'yes' if report['webglass_on_path'] else 'no'}",
-        f"webglass version: {report['webglass_version'] or 'unknown'}",
-    ]
-    emit_result("\n".join(lines), json_mode=False)
+    else:
+        lines = [
+            f"webglass on PATH: {'yes' if report['webglass_on_path'] else 'no'}",
+            f"webglass version: {report['webglass_version'] or 'unknown'}",
+        ]
+        emit_result("\n".join(lines), json_mode=False)
     return 0
 
 
