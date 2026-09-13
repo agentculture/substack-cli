@@ -1,1 +1,1 @@
-"""Substack domain surface (comment/feed/post nouns and shared helpers)."""
+"""Substack domain layer: HTTP transport, webglass adapter, renderers, body builder."""
