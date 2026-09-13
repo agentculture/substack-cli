@@ -118,6 +118,20 @@ def _publication_base(host: str) -> str:
     return _api_base_template().format(host=publication_host(host))
 
 
+def publication_base(host: str) -> str:
+    """Public wrapper on :func:`_publication_base`.
+
+    Validates `host` (raises ``CliError(1)`` per :func:`publication_host`) and
+    returns the publication API base URL, honouring ``SUBSTACK_API_BASE`` the
+    same way :func:`get_json`/:func:`request_json` do. Exists so callers that
+    build a URL for a *different* transport (e.g. the webglass adapter's
+    ``request()``, which goes over a browser session rather than this
+    module's urllib opener) can reuse the same base-URL logic instead of
+    re-deriving it.
+    """
+    return _publication_base(host)
+
+
 def _join(base: str, path: str) -> str:
     return base.rstrip("/") + "/" + path.lstrip("/")
 
