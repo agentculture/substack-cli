@@ -114,8 +114,19 @@ def publication_host(host: str) -> str:
     return host
 
 
-def _publication_base(host: str) -> str:
+def publication_base(host: str) -> str:
+    """The publication API base URL for `host` (validated, env-overridable).
+
+    Public because the owner-side verbs need the same base URL without going
+    through this module's urllib transport: their requests are made by the
+    webglass adapter (the browser session holds the auth), so they build the
+    URL here and hand it to `substack_cli.substack.webglass.request`.
+    """
     return _api_base_template().format(host=publication_host(host))
+
+
+def _publication_base(host: str) -> str:
+    return publication_base(host)
 
 
 def _join(base: str, path: str) -> str:
