@@ -20,19 +20,21 @@ what the repo is and how it is laid out, not who is reading it.
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** *(planned — see Status below)* — publish and schedule posts, read
-posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
+account** — publish and schedule posts, read posts and comments, react to
+posts/comments, and read the account feed. Unofficial community tool, not
 affiliated with Substack.
 
-**Status: scaffold — and this matters for every answer you give about the
-repo.** None of that Substack surface exists on disk yet. What is checked in
-today is the AgentCulture sibling baseline this repo was scaffolded from
-(`culture-agent-template`): an agent-first CLI skeleton (`whoami`, `learn`,
-`explain`, `overview`, `doctor`, `cli overview`), a mesh identity, the vendored
-skill kit, and a build/deploy baseline. If you are asked where posts,
-subscribers, comments or statistics are implemented, the honest answer is that
-they are not — say so and point at what *is* there, rather than inferring an
-implementation from the project description, the README, or this file.
+Five nouns are wired on disk: `account`, `post`, `comment`, `reaction`,
+`feed` (see [Substack surface](#substack-surface) below). The AgentCulture
+sibling baseline this repo was scaffolded from (`culture-agent-template`) is
+still underneath: an agent-first CLI skeleton (`whoami`, `learn`, `explain`,
+`overview`, `doctor`, `cli overview`), a mesh identity, the vendored skill
+kit, and a build/deploy baseline. If you are asked where posts, comments, or
+reactions are implemented, point at `substack_cli/cli/_commands/` and
+`substack_cli/substack/` rather than inferring from the project description
+alone — and if a question assumes a verb this repo does not have (e.g.
+subscriber management or audience statistics), say so rather than guessing at
+one.
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the skills supplier), [`steward`](https://github.com/agentculture/steward)
@@ -81,16 +83,32 @@ requires nor changes that declaration.
 `backend: colleague` with `model: associate`. That is a per-repo choice; this
 one does not ship it.)
 
+## Substack surface
+
+Public read verbs (`post list`/`get`, `comment list`, `reaction list`) are
+stdlib HTTP with no session. Owner verbs (`post publish`/`schedule`/
+`unpublish`/`delete`, `comment reply`/`delete`, `reaction add`/`remove`,
+`feed read`, `account whoami`) shell out to the `webglass` binary (sibling
+project `webglass-cli`) and need `$SUBSTACK_WEBGLASS_SESSION` naming a
+session whose browser is logged in to Substack; until `webglass-cli` can
+create such a session (`agentculture/webglass-cli#17`), owner verbs exit `2`
+with a hint. Every endpoint the CLI calls must appear in
+[`docs/api/substack-endpoints.md`](docs/api/substack-endpoints.md) before it
+ships — that is the only record of what Substack's unpublished API does.
+
 ## Layout (what you can read/find/summarize here)
 
 ```text
 substack_cli/             agent-first CLI (cited from teken's python-cli reference)
   cli/                    parser, error/output contract, _commands/ (verbs)
+  substack/               domain layer: http.py, webglass.py, render.py, body.py
   explain/                markdown catalog for `explain`
 tests/                    CLI smoke, introspection, harness-registry, script tests
+tests/fakes/              fakes for the Substack domain layer
 scripts/                  scan-secrets.py, harness-smoke.py (both CI gates)
 .claude/skills/           vendored guildmaster skill kit (cite-don't-import)
-docs/                     skill provenance + the four-harness contract/verification
+docs/                     skill provenance, four-harness contract/verification,
+                          docs/api/substack-endpoints.md (observed endpoint map)
 culture.yaml              mesh identity (suffix + backend)
 .github/workflows/        tests.yml (test/lint/harness-smoke/version-check), publish.yml
 ```

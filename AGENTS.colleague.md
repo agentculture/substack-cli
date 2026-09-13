@@ -75,20 +75,39 @@ defect in this repo.)
 ## What this project is
 
 `substack-cli` is an **agent-first CLI to manage a Substack publication and
-account** *(planned — see Status below)* — publish and schedule posts, read
-posts and comments, run audience and post statistics, and manage subscribers. Unofficial community tool, not
+account** — publish and schedule posts, read posts and comments, react to
+posts/comments, and read the account feed. Unofficial community tool, not
 affiliated with Substack.
 
-**Status: scaffold.** None of that domain surface exists on disk yet. What is
-checked in is the AgentCulture sibling baseline this repo was scaffolded from:
-the CLI skeleton (`whoami`, `learn`, `explain`, `overview`, `doctor`,
-`cli overview`), a mesh identity, the vendored skill kit, and a build/deploy
-baseline. If a brief assumes a posts/subscribers/stats module exists, say so
-rather than inventing where it lives.
+Five nouns are wired: `account`, `post`, `comment`, `reaction`, `feed`. The
+AgentCulture sibling baseline this repo was scaffolded from is still
+underneath: the CLI skeleton (`whoami`, `learn`, `explain`, `overview`,
+`doctor`, `cli overview`), a mesh identity, the vendored skill kit, and a
+build/deploy baseline. If a brief assumes a verb this repo does not have
+(e.g. subscriber management or audience statistics), say so rather than
+inventing where it lives.
 
 `CLAUDE.md` is written for a Claude Code session working *on* the repo — it is
 not your runtime prompt, but it is the fullest write-up of the conventions if
 you need more context than fits here.
+
+## Substack surface
+
+The domain layer is `substack_cli/substack/`: `http.py` (stdlib HTTP for the
+public read verbs — `post list`/`get`, `comment list`, `reaction list`, no
+session needed), `webglass.py` (subprocess wrapper around the sibling
+`webglass-cli` project's `webglass` binary for owner verbs — `post
+publish`/`schedule`/`unpublish`/`delete`, `comment reply`/`delete`, `reaction
+add`/`remove`, `feed read`, `account whoami`), and `render.py`/`body.py`
+(ProseMirror body construction). Owner verbs need
+`$SUBSTACK_WEBGLASS_SESSION` naming a session already logged in to Substack;
+until `webglass-cli` can create such a session itself
+(`agentculture/webglass-cli#17`), owner verbs exit `2` with a hint rather than
+fail unexplained. `post publish` is draft-first — without `--send` it only
+creates a draft; `--send` alone emails every subscriber and cannot be
+recalled. Every endpoint the CLI calls must appear in
+[`docs/api/substack-endpoints.md`](docs/api/substack-endpoints.md) before it
+ships. Tests for this layer use fakes under `tests/fakes/`.
 
 ## Contracts to respect when you touch code
 

@@ -1,22 +1,33 @@
 # substack-cli
 
 Agent-first CLI to manage a Substack publication and account: publish and
-schedule posts, read posts and comments, run audience and post statistics, and
-manage subscribers. Unofficial community tool, not affiliated with Substack.
+schedule posts, read posts and comments, react to posts/comments, and read the
+account feed. Unofficial community tool, not affiliated with Substack.
 
 ## Status
 
-**Scaffold.** The Substack surface above is the goal, not what ships today.
-What is on disk now is the AgentCulture sibling baseline this repo was
-scaffolded from ([`culture-agent-template`](https://github.com/agentculture/culture-agent-template)):
-an agent-first CLI skeleton, a mesh identity, the vendored skill kit, and a
-buildable/deployable package baseline. Everything documented below is
-checked-in reality; the post/subscriber/stats verbs are the work ahead.
+**Five nouns wired: `account`, `post`, `comment`, `reaction`, `feed`.** Public
+read verbs (`post list`/`get`, `comment list`, `reaction list`) are plain
+stdlib HTTP against the observed Substack API, no session required. Owner
+verbs (`post publish`/`schedule`/`unpublish`/`delete`, `comment reply`/`delete`,
+`reaction add`/`remove`, `feed read`, `account whoami`) shell out to the
+`webglass` binary (the sibling `webglass-cli` project) with a session named by
+`$SUBSTACK_WEBGLASS_SESSION` — see [One-time login](#one-time-login) and
+[Terms of Service risk](#terms-of-service-risk) below before pointing this at
+a real account. The AgentCulture sibling baseline this repo was scaffolded
+from ([`culture-agent-template`](https://github.com/agentculture/culture-agent-template))
+is still underneath: the agent-first CLI skeleton, a mesh identity, the
+vendored skill kit, and a buildable/deployable package baseline.
 
 ## What you get today
 
+- **Five Substack nouns** — `account`, `post`, `comment`, `reaction`, `feed` —
+  see [CLI](#cli) below for the full verb table.
 - **An agent-first CLI** cited from [teken](https://github.com/agentculture/teken)
-  (`afi-cli`) — the runtime package has no third-party dependencies.
+  (`afi-cli`) — the runtime package has no third-party dependencies; even the
+  Substack domain layer (`substack_cli/substack/`: `http.py`, `webglass.py`,
+  `render.py`, `body.py`) uses only the standard library and never imports
+  Playwright.
 - **A mesh identity** — `culture.yaml` (`suffix` + `backend`) and the matching
   resident prompt file (`CLAUDE.md`, since this repo runs `backend: claude`).
   The mesh resident is one of **two separate selections** over this clone —
@@ -31,6 +42,51 @@ checked-in reality; the post/subscriber/stats verbs are the work ahead.
 - **A build + deploy baseline** — pytest, lint, the agent-first rubric gate, a
   committed-secret scanner, a per-harness smoke check, and PyPI Trusted
   Publishing wired into GitHub Actions.
+
+## Terms of Service risk
+
+Read this before pointing `substack-cli` at a real account. Substack's Terms
+of Service prohibit automated processes against the service and prohibit
+reverse engineering it. This CLI's owner verbs do both: they drive the same
+internal API (`/api/v1`, observed and documented in
+[`docs/api/substack-endpoints.md`](docs/api/substack-endpoints.md), not a
+published or supported API) that the account owner's own browser uses, via a
+webglass browser session logged in as that owner. There is no Substack
+partnership, review, or endorsement behind any of this.
+
+Use it only against your own account, at your own risk — including the risk
+of account action by Substack. To keep that risk bounded, the client is
+deliberately conservative: requests are serial (no concurrency, no request
+pooling), failures back off rather than hammer the endpoint, and a write call
+that fails is never auto-retried — a failed `post publish` or `comment reply`
+surfaces the error and stops rather than silently resending a state-changing
+request. `post publish --send` (without `--no-email`) emails every subscriber
+and cannot be recalled once Substack has sent it — see the flag description in
+the CLI table below.
+
+## One-time login
+
+Owner verbs authenticate through a `webglass` session rather than a stored
+password or API token. Substack has no user-facing API token, so the CLI
+drives a real, session-cookied browser context via the sibling
+[`webglass-cli`](https://github.com/agentculture/webglass-cli) project's
+`webglass` binary (installed separately, on `PATH`) instead of embedding a
+browser automation library itself.
+
+The intended one-time setup is: open a **headed** (visible, not headless)
+webglass browser session, log in to Substack manually in that window exactly
+as a person would (including any 2FA challenge), and then name that session in
+`$SUBSTACK_WEBGLASS_SESSION` so every owner verb reuses its cookies instead of
+logging in again.
+
+**That login step does not exist yet.** `webglass-cli` can drive an existing
+session but cannot yet create a fresh, authenticated, headed session for you —
+tracked upstream as
+[`agentculture/webglass-cli#17`](https://github.com/agentculture/webglass-cli/issues/17).
+Until that lands, every owner verb here detects the missing capability and
+exits `2` with a hint rather than guessing at a workaround; public read verbs
+(`post list`/`get`, `comment list`, `reaction list`) need no session and work
+today.
 
 ## Quickstart
 
@@ -56,10 +112,31 @@ help output prints. `python -m substack_cli` works too.
 | `overview` | Read-only descriptive snapshot of the agent. |
 | `doctor` | Check the agent-identity invariants (prompt-file-present, backend-consistency). |
 | `cli overview` | Describe the CLI surface itself. |
+| `account whoami` | Account identity via the webglass session (owner). |
+| `account overview` | Describe the account noun's verbs. |
+| `post list` | List a publication's archive (public, no session). |
+| `post get` | Fetch one post by slug (public, no session). |
+| `post publish` | Create a draft; with `--send` also publish it (owner). Draft-first: without `--send` only a draft is created. `--send --no-email` publishes without notifying subscribers; `--send` alone emails every subscriber and cannot be recalled. |
+| `post schedule` | Schedule a draft for a future publish time (owner). |
+| `post unpublish` | Return a published post to drafts (owner). |
+| `post delete` | Delete a draft or unpublished post (owner). |
+| `post overview` | Describe the post noun's verbs. |
+| `comment list` | List a post's comments (public, no session). |
+| `comment reply` | Reply to a post or comment (owner). |
+| `comment delete` | Delete a comment (owner). |
+| `comment overview` | Describe the comment noun's verbs. |
+| `reaction list` | List a post's aggregate reaction counts (public, no session). |
+| `reaction add` | React to a post or comment (owner). |
+| `reaction remove` | Remove your reaction (owner). |
+| `reaction overview` | Describe the reaction noun's verbs. |
+| `feed read` | Read the account's Notes/reader feed (owner). |
+| `feed overview` | Describe the feed noun's verbs. |
 
-Every command supports `--json`. Results go to stdout, errors/diagnostics to
-stderr (never mixed). Exit codes: `0` success, `1` user error, `2` environment
-error, `3+` reserved.
+"Owner" verbs need `$SUBSTACK_WEBGLASS_SESSION` (see
+[One-time login](#one-time-login)); until that session flow ships they exit
+`2` with a hint rather than fail unexplained. Every command supports
+`--json`. Results go to stdout, errors/diagnostics to stderr (never mixed).
+Exit codes: `0` success, `1` user error, `2` environment error, `3+` reserved.
 
 ## Prompt files by harness
 
