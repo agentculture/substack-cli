@@ -7,15 +7,14 @@ substack_cli.substack.webglass can be exercised without depending on the real
 webglass-cli tool being installed or reachable.
 
 Canned response selection (checked in this order):
-  1. ``WEBGLASS_FAKE_RESPONSE_BY_URL`` — a JSON *object* mapping a URL
-     substring to a canned response (object, or JSON-encoded string) for that
-     call. The invocation's ``--url <value>`` argument is matched against
-     each key by substring containment; the first matching key (in the
-     object's own key order) wins. Callers that make more than one request
-     with different URLs in a single command (e.g. ``account whoami``, which
-     hits both ``/subscription`` and ``/publication``) use this to return a
-     different canned body per call. Falls through to steps 2-4 below when
-     no ``--url`` argument is present, or none of the keys match.
+  1. ``WEBGLASS_FAKE_SEQUENCE_DIR`` — a directory holding ``response-0.json``,
+     ``response-1.json``, ... one per expected invocation, for flows that make
+     several webglass calls in a row (``post publish`` is subscription ->
+     create draft -> publish). Each invocation is its own process, so the
+     cursor lives on disk in ``<dir>/cursor``; once the sequence is exhausted
+     the last response is reused. Every invocation's argv is appended as a
+     JSON array to ``<dir>/calls.jsonl`` so a test can assert on the exact
+     method, URL and body of each call in the flow.
   2. ``WEBGLASS_FAKE_RESPONSE_FILE`` — path to a JSON file to print verbatim.
   3. ``WEBGLASS_FAKE_RESPONSE`` — a JSON string to print verbatim.
   4. Fallback: a minimal "succeeded" WebOperationResult.
@@ -41,6 +40,29 @@ DEFAULT_RESULT = {
 }
 
 
+def sequenced_payload(directory: str) -> str:
+    """Record this invocation and return the response canned for its turn."""
+    with open(os.path.join(directory, "calls.jsonl"), "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(sys.argv[1:]) + "\n")
+
+    cursor_path = os.path.join(directory, "cursor")
+    try:
+        with open(cursor_path, "r", encoding="utf-8") as handle:
+            cursor = int(handle.read().strip() or "0")
+    except FileNotFoundError:
+        cursor = 0
+    with open(cursor_path, "w", encoding="utf-8") as handle:
+        handle.write(str(cursor + 1))
+
+    while cursor >= 0:
+        candidate = os.path.join(directory, "response-%d.json" % cursor)
+        if os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as handle:
+                return handle.read()
+        cursor -= 1
+    return json.dumps(DEFAULT_RESULT)
+
+
 def _url_arg(argv: list[str]) -> str | None:
     for i, token in enumerate(argv):
         if token == "--url" and i + 1 < len(argv):
@@ -51,6 +73,7 @@ def _url_arg(argv: list[str]) -> str | None:
 
 
 def _response_by_url(argv: list[str]) -> str | None:
+    """``WEBGLASS_FAKE_RESPONSE_BY_URL``: JSON object mapping a URL substring to a response."""
     raw_map = os.environ.get("WEBGLASS_FAKE_RESPONSE_BY_URL")
     if not raw_map:
         return None
@@ -70,11 +93,14 @@ def _response_by_url(argv: list[str]) -> str | None:
 
 
 def main() -> int:
+    sequence_dir = os.environ.get("WEBGLASS_FAKE_SEQUENCE_DIR")
     response_by_url = _response_by_url(sys.argv[1:])
     response_file = os.environ.get("WEBGLASS_FAKE_RESPONSE_FILE")
     response_text = os.environ.get("WEBGLASS_FAKE_RESPONSE")
 
-    if response_by_url is not None:
+    if sequence_dir:
+        payload = sequenced_payload(sequence_dir)
+    elif response_by_url is not None:
         payload = response_by_url
     elif response_file:
         with open(response_file, "r", encoding="utf-8") as handle:
